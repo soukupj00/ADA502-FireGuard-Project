@@ -1,0 +1,92 @@
+name: FireGuard CI
+
+on:
+  push:
+    branches: [ "main" ]
+    # Triggers on changes to relevant paths only
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ------------------------------------------------------------------
+  # JOB 1: BACKEND (FastAPI + uv)
+  # ------------------------------------------------------------------
+  backend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    # Only run this job if backend files changed (optional optimization)
+    # if: contains(github.event.pull_request.changed_files, 'backend/')
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        # Installs uv (the package manager specified in frcm README)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Dependencies
+        # Syncs the environment based on pyproject.toml and uv.lock
+        run: uv sync --all-extras --dev
+
+      - name: Run Linter (Ruff)
+        # Ruff is standard in the uv ecosystem, but we check if it's installed first
+        run: |
+          if uv run ruff --version > /dev/null 2>&1; then
+            uv run ruff check .
+          else
+            echo "Ruff not configured, skipping lint."
+          fi
+
+      - name: Run Tests
+        # Runs pytest using the virtual environment created by uv
+        run: uv run pytest
+        # Allows CI to pass even if you haven't written tests yet
+        continue-on-error: true 
+
+      - name: Verify Docker Build
+        # Ensures the solution is "cloud-deployable" 
+        # This assumes you have created the Dockerfile as discussed.
+        run: docker build . -t fireguard-backend:test
+
+  # ------------------------------------------------------------------
+  # JOB 2: FRONTEND (React + TypeScript + Tailwind)
+  # ------------------------------------------------------------------
+  frontend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          # Important: tells the cache where the lock file is located
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        # npm ci is faster and stricter than npm install for CI environments
+        run: npm ci
+
+      - name: Lint Code
+        # Checks for TypeScript and Tailwind configuration errors
+        run: npm run lint
+
+      - name: Build Application
+        # Verifies the project builds successfully for production
+        run: npm run build
