@@ -1,13 +1,8 @@
-name: FireGuard CI
+name: FireGuard CI/CD
 
 on:
   push:
     branches: [ "main" ]
-    # Triggers on changes to relevant paths only
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/**'
   pull_request:
     branches: [ "main" ]
 
@@ -15,58 +10,53 @@ jobs:
   # ------------------------------------------------------------------
   # JOB 1: BACKEND (FastAPI + uv)
   # ------------------------------------------------------------------
-  backend-ci:
+  backend:
+    name: Backend CI
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./backend
-    # Only run this job if backend files changed (optional optimization)
-    # if: contains(github.event.pull_request.changed_files, 'backend/')
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install uv
-        # Installs uv (the package manager specified in frcm README)
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
 
       - name: Set up Python
         run: uv python install 3.12
 
       - name: Install Dependencies
-        # Syncs the environment based on pyproject.toml and uv.lock
+        # Installs dev dependencies (needed for tests/linting)
         run: uv sync --all-extras --dev
 
       - name: Run Linter (Ruff)
-        # Ruff is standard in the uv ecosystem, but we check if it's installed first
+        # Ruff acts as both Linter (flake8) and Formatter (black)
         run: |
-          if uv run ruff --version > /dev/null 2>&1; then
-            uv run ruff check .
-          else
-            echo "Ruff not configured, skipping lint."
-          fi
+          uv run ruff check .
+          uv run ruff format --check .
 
       - name: Run Tests
-        # Runs pytest using the virtual environment created by uv
+        # Runs pytest using the environment created by uv
         run: uv run pytest
-        # Allows CI to pass even if you haven't written tests yet
-        continue-on-error: true 
 
       - name: Verify Docker Build
-        # Ensures the solution is "cloud-deployable" 
-        # This assumes you have created the Dockerfile as discussed.
-        run: docker build . -t fireguard-backend:test
+        # Ensures the Dockerfile is valid and the app builds successfully
+        run: docker build . -t fireguard-backend:latest
 
   # ------------------------------------------------------------------
-  # JOB 2: FRONTEND (React + TypeScript + Tailwind)
+  # JOB 2: FRONTEND (React + Vite)
   # ------------------------------------------------------------------
-  frontend-ci:
+  frontend:
+    name: Frontend CI
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./frontend
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -76,17 +66,19 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          # Important: tells the cache where the lock file is located
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Dependencies
-        # npm ci is faster and stricter than npm install for CI environments
         run: npm ci
 
-      - name: Lint Code
-        # Checks for TypeScript and Tailwind configuration errors
+      - name: Run Linter
+        # Checks for code quality issues
         run: npm run lint
 
-      - name: Build Application
-        # Verifies the project builds successfully for production
+      - name: Type Check (TypeScript)
+        # Verifies no type errors exist
+        run: npm run tsc -- --noEmit
+
+      - name: Build for Production
+        # Compiles the React app to static files (dist/)
         run: npm run build
