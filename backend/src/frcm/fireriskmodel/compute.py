@@ -1,25 +1,37 @@
-import numpy as np
 import datetime
+
+import numpy as np
 
 import frcm.datamodel.model as dm
 import frcm.fireriskmodel.parameters as mp
-import frcm.fireriskmodel.utils as func
 import frcm.fireriskmodel.preprocess as pp
+import frcm.fireriskmodel.utils as func
 
 
 def compute(wd: dm.WeatherData) -> dm.FireRiskPrediction:
 
     # Get interpolated values #TODO (NOTE) The max_time_delta represents the largest gap in missing data (seconds). It can be used to provide suited warning/error message.
-    start_time, time_interpolated_sec, temp_interpolated, humidity_interpolated, wind_interpolated, max_time_delta = pp.preprocess(wd)
+    (
+        start_time,
+        time_interpolated_sec,
+        temp_interpolated,
+        humidity_interpolated,
+        wind_interpolated,
+        max_time_delta,
+    ) = pp.preprocess(wd)
 
     # Compute RH_in and TTF
     rh_in, ttf = compute_fr(temp_interpolated, humidity_interpolated)
 
     # Reduce data to once per hour, but the time is still given as seconds
-    rf = int(3600 / mp.delta_t)  # Reduction factor, i.e., how many intervals per hour. Default delta_t = 720 s, hence rf = 5.
+    rf = int(
+        3600 / mp.delta_t
+    )  # Reduction factor, i.e., how many intervals per hour. Default delta_t = 720 s, hence rf = 5.
     rh_in_hour = rh_in[::rf]  # Average is not computed, values are extracted per hour.
     ttf_in_hour = ttf[::rf]
-    time_in_hour = time_interpolated_sec[::rf] # Time is still in seconds but given for every hour.
+    time_in_hour = time_interpolated_sec[
+        ::rf
+    ]  # Time is still in seconds but given for every hour.
 
     # Create response according to datamodel
     firerisks = []
@@ -33,9 +45,10 @@ def compute(wd: dm.WeatherData) -> dm.FireRiskPrediction:
 
 
 def compute_fr(temp_c_out, rh_out):
-
     "Indoor temperature vector"
-    temp_c_in = [mp.T_c_in] * len(temp_c_out)  # Potential future changes may involve dynamic in-home temperatures
+    temp_c_in = [mp.T_c_in] * len(
+        temp_c_out
+    )  # Potential future changes may involve dynamic in-home temperatures
 
     """ compute saturation vapor pressures and water concentrations, outdoor and indoor """
     # w = water, sat = saturation
@@ -77,7 +90,6 @@ def compute_fr(temp_c_out, rh_out):
     # shall contain water concentration (contribution) per timestep from wooden surfaces
     c_wall = np.zeros(len(temp_c_out))
 
-
     # set initial conditions
     wall[0] = [initial_fmc] * mp.sub_layers
     surface[0] = func.calc_surf(wall[0][0], wall[0][1])
@@ -88,16 +100,20 @@ def compute_fr(temp_c_out, rh_out):
     c_wall[0] = func.calc_cwall(delta_c[0])
 
     c_ac = list(map(func.calc_cac, beta, cw_out, temp_c_out, temp_c_in))
-    c_supply = (list(map(func.calc_csupply, supply)))
+    c_supply = list(map(func.calc_csupply, supply))
 
     for i in range(len(temp_c_out) - 1):
         # compute fmc in layer 1
-        wall_vector[0] = func.calc_layer1(rh_in[i], rh_wall[i], wall[i][0], wall[i][1], cw_sat_in[i])
+        wall_vector[0] = func.calc_layer1(
+            rh_in[i], rh_wall[i], wall[i][0], wall[i][1], cw_sat_in[i]
+        )
         n = 0
-        for l in range(mp.sub_layers-2):
+        for l in range(mp.sub_layers - 2):
             # compute fmc in wall layers 2 to N-1
             n = n + 1
-            wall_vector[n] = func.calc_middle_layers(wall[i][n], wall[i][n - 1], wall[i][n + 1])
+            wall_vector[n] = func.calc_middle_layers(
+                wall[i][n], wall[i][n - 1], wall[i][n + 1]
+            )
         # compute fmc in wall layer N (panel backside)
         wall_vector[-1] = func.calc_outer_layer(wall[i][-1], wall[i][-2])
         # update wall array
@@ -109,7 +125,9 @@ def compute_fr(temp_c_out, rh_out):
         # update water concentration difference between bulk air and boundary layer
         delta_c[i + 1] = func.calc_deltac(rh_in[i], rh_wall[i], cw_sat_in[i])
         # update indoor water concentration
-        cw_in[i + 1] = func.calc_cwin(c_ac[i], c_wall[i], c_supply[i], cw_in[i], beta[i])
+        cw_in[i + 1] = func.calc_cwin(
+            c_ac[i], c_wall[i], c_supply[i], cw_in[i], beta[i]
+        )
         # update indoor relative humidity
         rh_in[i + 1] = cw_in[i + 1] / cw_sat_in[i + 1]
         # update c_wall
@@ -117,9 +135,7 @@ def compute_fr(temp_c_out, rh_out):
 
     # Compute ttf
     factor = 100 / mp.rho_wood
-    fmc = list(map(lambda x: x*factor, surface))
-    ttf = list(map(lambda y: 2 * np.exp(0.16*y),fmc))
+    fmc = list(map(lambda x: x * factor, surface))
+    ttf = list(map(lambda y: 2 * np.exp(0.16 * y), fmc))
 
     return rh_in, ttf
-
-

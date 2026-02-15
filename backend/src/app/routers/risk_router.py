@@ -1,6 +1,7 @@
 # backend/src/app/routers/risk_router.py
 from fastapi import APIRouter, HTTPException
-from src.app.models import FireRiskResponse, FireRiskRequest
+
+from app.models import FireRiskRequest, FireRiskResponse
 
 # Import the provided FRCM logic here
 # from src.frcm.fireriskmodel import compute
@@ -25,5 +26,5 @@ async def calculate_fire_risk(payload: FireRiskRequest) -> FireRiskResponse:
         type="FireRiskEstimate",  # JSON-LD type
         location_id=payload.location_id,
         risk_score=0.85,
-        time_to_flashover=5.2
+        time_to_flashover=5.2,
     )
