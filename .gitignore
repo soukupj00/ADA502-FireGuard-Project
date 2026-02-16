@@ -1,0 +1,50 @@
+# --- IDEs & Editors ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Python (Backend & Intelligence System) ---
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Byte-compiled / Optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
+
+# Testing & Coverage
+.coverage
+.pytest_cache/
+htmlcov/
+junit/
+
+# Environment Variables (CRITICAL for security)
+.env
+.env.local
+.env.production
+# Keep example files
+!*.example
+
+# --- Node.js / React (Frontend) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite Build Output
+frontend/dist/
+frontend/dist-ssr/
+
+# --- Docker ---
+# Ignore local override files used for dev custom config
+docker-compose.override.yml
