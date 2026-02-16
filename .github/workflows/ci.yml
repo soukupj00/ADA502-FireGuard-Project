@@ -47,8 +47,43 @@ jobs:
         # Ensures the Dockerfile is valid and the app builds successfully
         run: docker build . -t fireguard-backend:latest
 
+  #------------------------------------------------
+  # Job 2: INTELLIGENCE SYSTEM
+  #------------------------------------------------
+  intelligence-ci:
+    name: Intelligence System CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./intelligence-system
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Lint (Ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      # Add tests if you have them in intelligence-system/tests/
+      # - name: Run Tests
+      #   run: uv run pytest
+
+      - name: Verify Docker Build
+        run: docker build . -t fireguard-intelligence:latest
+
   # ------------------------------------------------------------------
-  # JOB 2: FRONTEND (React + Vite)
+  # JOB 3: FRONTEND (React + Vite)
   # ------------------------------------------------------------------
   frontend:
     name: Frontend CI
