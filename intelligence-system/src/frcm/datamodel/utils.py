@@ -1,4 +1,5 @@
 import datetime
+
 import dateutil.parser
 
 import frcm.datamodel.model as dm
@@ -26,7 +27,9 @@ def is_sorted(data: list[dm.WeatherDataPoint]) -> bool:
     return ascending
 
 
-def within_timedelta(data: list[dm.WeatherDataPoint], max_delta: datetime.timedelta) -> bool:
+def within_timedelta(
+    data: list[dm.WeatherDataPoint], max_delta: datetime.timedelta
+) -> bool:
     i = 1
     violated = False
 
@@ -41,10 +44,11 @@ def within_timedelta(data: list[dm.WeatherDataPoint], max_delta: datetime.timede
 def dict_to_wdp(wdp) -> dm.WeatherDataPoint:
 
     wdp = dm.WeatherDataPoint(
-        temperature=wdp['temperature'],
-        humidity=wdp['humidity'],
-        wind_speed=wdp['wind_speed'],
-        timestamp=dateutil.parser.parse(wdp['timestamp']))
+        temperature=wdp["temperature"],
+        humidity=wdp["humidity"],
+        wind_speed=wdp["wind_speed"],
+        timestamp=dateutil.parser.parse(wdp["timestamp"]),
+    )
 
     return wdp
 
@@ -54,11 +58,11 @@ def list_to_wdps(wdps) -> list[dm.WeatherDataPoint]:
     return list(map(dict_to_wdp, wdps))
 
 
-def wdps_list_str(wdps : list[dm.WeatherDataPoint]) -> str:
+def wdps_list_str(wdps: list[dm.WeatherDataPoint]) -> str:
     # TODO: current string concatenation is inefficient
-    format_str = ''
+    format_str = ""
     for wdp in wdps:
-        format_str = format_str + str(wdp) + '\n'
+        format_str = format_str + str(wdp) + "\n"
 
     return format_str
 
@@ -66,6 +70,7 @@ def wdps_list_str(wdps : list[dm.WeatherDataPoint]) -> str:
 # TODO: validate could possibly raise different exceptions depending on violation
 # TODO: check also that created is between max_time and min_time
 # TODO: check that the required data is also present in the data points
+
 
 def wd_validate(wd: dm.WeatherData, max_delta: datetime.timedelta):
 
@@ -78,7 +83,11 @@ def wd_validate(wd: dm.WeatherData, max_delta: datetime.timedelta):
     is_delta_obs = within_timedelta(wd.observations.data, max_delta)
     is_delta_fct = within_timedelta(wd.forecast.data, max_delta)
 
-    return ((max_time_obs < min_time_fct) and
-            is_sorted_obs and is_sorted_fct and
-            is_delta_obs and is_delta_fct and
-            (max_time_obs - min_time_fct) < max_delta)
+    return (
+        (max_time_obs < min_time_fct)
+        and is_sorted_obs
+        and is_sorted_fct
+        and is_delta_obs
+        and is_delta_fct
+        and (max_time_obs - min_time_fct) < max_delta
+    )
