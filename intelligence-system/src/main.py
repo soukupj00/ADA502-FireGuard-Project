@@ -1,43 +1,66 @@
 # intelligence-system/src/main.py
 import asyncio
-import os
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+import logging
 
-# Import your FRCM logic here
-# from frcm.fireriskmodel import compute_risk ...
+from met_api import fetch_weather
+from risk_calculator import calculate_risk
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# from src.database import save_risk_data  # You need to implement this database insert
+
+# Configure Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("IntelligenceSystem")
+
+# List of locations to monitor (Latitude, Longitude)
+# Example: Bergen
+LOCATIONS = [
+    {"name": "Bergen", "lat": 60.3913, "lon": 5.3221},
+    # Add more locations here...
+]
 
 
-async def run_worker():
-    print("Intelligence System started...")
+async def job():
+    """The task to run every 10 minutes."""
+    logger.info("Starting 10-minute cycle...")
 
-    # 1. Setup DB Connection
-    engine = create_async_engine(DATABASE_URL)
-    AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    for loc in LOCATIONS:
+        # 1. Fetch Full Series
+        met_data = await fetch_weather(loc["lat"], loc["lon"])
+        logger.info(
+            f"Fetched data for {loc['name']} ({len(met_data['properties']['timeseries'])} timesteps)"
+        )
+
+        if met_data:
+            # 2. Compute Risk (Using the complex FRCM model)
+            risk_result = calculate_risk(met_data)
+
+            if risk_result:
+                ttf = risk_result["ttf"]
+                logger.info(f"Location: {loc['name']}, TTF: {ttf}")
+
+                # 3. Save to DB
+                # await save_risk_data(...)
+            else:
+                logger.warning(f"Calculation failed for {loc['name']}")
+        else:
+            logger.warning(f"Skipping {loc['name']} due to fetch error.")
+
+
+async def main():
+    logger.info("Intelligence System Worker Started.")
 
     while True:
         try:
-            print("Fetching weather data from Open APIs...")
-            # TODO: Add logic to fetch from MET.no using httpx
+            await job()
 
-            print("Calculating Fire Risk...")
-            # TODO: Run frcm logic
-
-            print("Saving to Database...")
-            async with AsyncSessionLocal() as session:
-                # TODO: Insert results into DB
-                # await session.commit()
-                pass
-
-            print("Cycle complete. Sleeping for 1 hour...")
-            await asyncio.sleep(3600)  # Sleep for 1 hour
+            # Wait for 10 minutes (600 seconds)
+            logger.info("Sleeping for 10 minutes...")
+            await asyncio.sleep(600)
 
         except Exception as e:
-            print(f"Error in worker cycle: {e}")
-            await asyncio.sleep(60)  # Retry after 1 minute
+            logger.error(f"Critical Worker Error: {e}")
+            await asyncio.sleep(60)  # Wait 1 min before retrying if crash
 
 
 if __name__ == "__main__":
-    asyncio.run(run_worker())
+    asyncio.run(main())

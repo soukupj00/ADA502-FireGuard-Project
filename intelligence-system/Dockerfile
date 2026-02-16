@@ -6,23 +6,25 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
+# 2. Configure uv
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# 2. Install Dependencies
+# 3. Install Dependencies
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --no-install-project
+# Force uv to use the container's python (3.12)
+RUN uv sync --python 3.12 --no-dev --no-install-project
 
-# 3. Copy Code
+# 4. Copy Code
 COPY src ./src
 
-# 4. Setup Environment
+# 5. Setup Environment
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 
-# 5. Security
+# 6. Security
 RUN useradd -m fireguard && chown -R fireguard /app
 USER fireguard
 
-# 6. Run the script directly
+# 7. Run the script
 CMD ["python", "src/main.py"]
