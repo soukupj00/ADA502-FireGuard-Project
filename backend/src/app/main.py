@@ -1,10 +1,11 @@
 import os
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from src.app.routers import risk_router
+from app.routers import risk_router
 
 
 @asynccontextmanager
@@ -23,14 +24,16 @@ def create_app() -> FastAPI:
         description="Fire risk calculation service",
         version="1.0.0",
         lifespan=lifespan,
-	docs_url="/api/docs/",
-	redoc_url="/api/redoc",
-	openapi_url="/api/openapi.json"
+        docs_url="/api/docs/",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
     )
 
     # Get allowed origins from env, defaulting to development settings
     # In docker-compose, we can pass "http://<YOUR_IP>" or "*"
-    origins_str = os.getenv("BACKEND_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+    origins_str = os.getenv(
+        "BACKEND_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    )
 
     # split the string into a list
     origins = [origin.strip() for origin in origins_str.split(",")]
