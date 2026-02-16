@@ -21,6 +21,15 @@ services:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
     # No "ports" section needed here because Nginx talks to it internally!
 
+  intelligence:
+    build: ./intelligence-system
+    restart: always
+    depends_on:
+      - db
+    environment:
+      # Connects to the SAME database as backend
+      DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
+
   # 3. Frontend + Nginx Proxy
   frontend:
     build: ./frontend
