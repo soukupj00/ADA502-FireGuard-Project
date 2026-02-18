@@ -35,8 +35,8 @@ The recommended way to run the project locally is using Docker Compose. This spi
 
 1.  Clone the repository:
     ```bash
-    git clone <repository_url>
-    cd FireGuard
+    git clone git@github.com:soukupj00/ADA502-FireGuard-Project.git
+    cd ADA502-FireGuard-Project
     ```
 
 2.  Start the services:
