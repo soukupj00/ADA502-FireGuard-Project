@@ -1,4 +1,3 @@
-# docker-compose.prod.yml
 services:
   # 1. Database
   db:
@@ -33,6 +32,8 @@ services:
   # 3. Frontend + Nginx Proxy
   frontend:
     build: ./frontend
+    dockerfile: Dockerfile
+    target: production
     restart: always
     ports:
       - "80:80"  # This is the ONLY port exposed to the internet
