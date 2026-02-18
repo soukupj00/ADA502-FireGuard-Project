@@ -18,7 +18,6 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
-    # No "ports" section needed here because Nginx talks to it internally!
 
   intelligence:
     build: ./intelligence-system
@@ -31,12 +30,13 @@ services:
 
   # 3. Frontend + Nginx Proxy
   frontend:
-    build: ./frontend
-    dockerfile: Dockerfile
-    target: production
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
     restart: always
     ports:
-      - "80:80"  # This is the ONLY port exposed to the internet
+      - "80:80"
     depends_on:
       - backend
 

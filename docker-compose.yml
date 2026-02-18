@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: fireguard_db
     ports:
-      - "5432:5432" # Exposed so you can check DB with tools like DBeaver
+      - "5432:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
 
@@ -22,9 +22,7 @@ services:
     depends_on:
       - db
     environment:
-      # Connects to the 'db' service using DEV credentials
       DATABASE_URL: postgresql+asyncpg://user:password@db:5432/fireguard_db
-    # Hot-reload configuration
     develop:
       watch:
         - action: sync
@@ -41,9 +39,7 @@ services:
     depends_on:
       - db
     environment:
-      # Connects to the SAME dev database
       DATABASE_URL: postgresql+asyncpg://user:password@db:5432/fireguard_db
-    # Syncs code so you can edit logic locally
     develop:
       watch:
         - action: sync
@@ -58,7 +54,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: development
-      ports:
+    ports:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
@@ -66,4 +62,4 @@ services:
       - backend
 
 volumes:
-  postgres_data_dev: # Separate volume for dev so you don't mix prod data
+  postgres_data_dev:
