@@ -14,7 +14,8 @@ mol_weight = 0.018015  # Kg/mol - molecular weight of water vapor (constant)
 fourier = 0.15  # Fourier number
 
 
-# Model specific parameters (generic wooden home enclosure describing a combined living room and kitchen)
+# Model specific parameters
+# (generic wooden home enclosure describing a combined living room and kitchen)
 
 T_k_in = 295.15  # K - indoor temperature (constant)
 T_c_in = 22  # 'C - indoor temperature (constant)

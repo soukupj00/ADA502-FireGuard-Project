@@ -1,4 +1,5 @@
 import datetime
+from typing import List, Tuple
 
 import numpy as np
 
@@ -9,8 +10,18 @@ import frcm.fireriskmodel.utils as func
 
 
 def compute(wd: dm.WeatherData) -> dm.FireRiskPrediction:
+    """
+    Computes the fire risk based on weather data.
 
-    # Get interpolated values #TODO (NOTE) The max_time_delta represents the largest gap in missing data (seconds). It can be used to provide suited warning/error message.
+    Args:
+        wd: WeatherData object containing temperature, humidity, and wind speed.
+
+    Returns:
+        FireRiskPrediction object containing a list of fire risks.
+    """
+    # Get interpolated values
+    # TODO (NOTE) The max_time_delta represents the largest gap in missing data
+    # (seconds). It can be used to provide suited warning/error message.
     (
         start_time,
         time_interpolated_sec,
@@ -24,9 +35,9 @@ def compute(wd: dm.WeatherData) -> dm.FireRiskPrediction:
     rh_in, ttf = compute_fr(temp_interpolated, humidity_interpolated)
 
     # Reduce data to once per hour, but the time is still given as seconds
-    rf = int(
-        3600 / mp.delta_t
-    )  # Reduction factor, i.e., how many intervals per hour. Default delta_t = 720 s, hence rf = 5.
+    # Reduction factor, i.e., how many intervals per hour.
+    # Default delta_t = 720 s, hence rf = 5.
+    rf = int(3600 / mp.delta_t)
     rh_in_hour = rh_in[::rf]  # Average is not computed, values are extracted per hour.
     ttf_in_hour = ttf[::rf]
     time_in_hour = time_interpolated_sec[
@@ -44,13 +55,26 @@ def compute(wd: dm.WeatherData) -> dm.FireRiskPrediction:
     return result
 
 
-def compute_fr(temp_c_out, rh_out):
-    "Indoor temperature vector"
-    temp_c_in = [mp.T_c_in] * len(
-        temp_c_out
-    )  # Potential future changes may involve dynamic in-home temperatures
+def compute_fr(
+    temp_c_out: List[float], rh_out: List[float]
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Computes the fire risk (RH_in and TTF) based on outdoor temperature and humidity.
 
-    """ compute saturation vapor pressures and water concentrations, outdoor and indoor """
+    Args:
+        temp_c_out: List of outdoor temperatures in Celsius.
+        rh_out: List of outdoor relative humidities.
+
+    Returns:
+        A tuple containing:
+            - rh_in: numpy array of indoor relative humidities.
+            - ttf: numpy array of Time To Flashover values.
+    """
+    # "Indoor temperature vector"
+    # Potential future changes may involve dynamic in-home temperatures
+    temp_c_in = [mp.T_c_in] * len(temp_c_out)
+
+    # compute saturation vapor pressures and water concentrations, outdoor and indoor
     # w = water, sat = saturation
     pw_sat_out = list(map(func.calc_pwsat, temp_c_out))
     cw_sat_out = list(map(func.calc_cwsat, pw_sat_out, temp_c_out))
@@ -62,13 +86,14 @@ def compute_fr(temp_c_out, rh_out):
     ach = list(map(func.calc_ach, temp_c_out, temp_c_in))
     beta = list(map(func.calc_beta, ach))
 
-    # calculate supply per timestep and make a supply vector (for future updates - currently containing constant values)
+    # calculate supply per timestep and make a supply vector
+    # (for future updates - currently containing constant values)
     supply_pts = (mp.supply_24h / (24 * 3600)) * mp.delta_t
     supply = [supply_pts] * len(temp_c_out)
 
-    """ create wall array and vector """
-
-    # wall array - storing fmc values - rows represent a step in time, columns represent wooden panel layers.
+    # create wall array and vector
+    # wall array - storing fmc values - rows represent a step in time,
+    # columns represent wooden panel layers.
     wall = np.zeros(shape=(len(temp_c_out), mp.sub_layers))
     # used to update the wall array
     wall_vector = np.zeros(mp.sub_layers)
@@ -76,7 +101,7 @@ def compute_fr(temp_c_out, rh_out):
     # initial fmc value in wooden panels
     initial_fmc = func.calc_fmc(mp.RH_in) * mp.rho_wood
 
-    """ placeholders """
+    # placeholders
     # shall contain wooden surface fmc values
     surface = np.zeros(len(temp_c_out))
     # shall contain wooden surface (boundary layer) rh values
@@ -108,7 +133,7 @@ def compute_fr(temp_c_out, rh_out):
             rh_in[i], rh_wall[i], wall[i][0], wall[i][1], cw_sat_in[i]
         )
         n = 0
-        for l in range(mp.sub_layers - 2):
+        for layer_index in range(mp.sub_layers - 2):
             # compute fmc in wall layers 2 to N-1
             n = n + 1
             wall_vector[n] = func.calc_middle_layers(

@@ -1,34 +1,52 @@
 # intelligence-system/src/main.py
 import asyncio
+import json
 import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from met_api import fetch_weather
+from database import create_db_and_tables, save_risk_data
+from met_api import fetch_all_weather_data, get_cities
 from risk_calculator import calculate_risk
-
-# from src.database import save_risk_data  # You need to implement this database insert
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("IntelligenceSystem")
 
-# List of locations to monitor (Latitude, Longitude)
-# Example: Bergen
-LOCATIONS = [
-    {"name": "Bergen", "lat": 60.3913, "lon": 5.3221},
-    # Add more locations here...
-]
+
+def save_to_json(data: Any, filename: str) -> None:
+    """
+    Saves the given data to a JSON file.
+
+    Args:
+        data: The data to save.
+        filename: The name of the file to save the data to.
+    """
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
 
 
-async def job():
-    """The task to run every 10 minutes."""
+async def job() -> None:
+    """
+    Fetches weather data, calculates fire risk, and saves it to the database.
+    """
     logger.info("Starting 10-minute cycle...")
 
-    for loc in LOCATIONS:
-        # 1. Fetch Full Series
-        met_data = await fetch_weather(loc["lat"], loc["lon"])
-        logger.info(
-            f"Fetched data for {loc['name']} ({len(met_data['properties']['timeseries'])} timesteps)"
-        )
+    cities = get_cities()
+    weather_data = await fetch_all_weather_data()
+
+    # Save weather data to a file
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    weather_data_filename = f"output/weather_data_{timestamp}.json"
+    save_to_json(weather_data, weather_data_filename)
+    logger.info(f"Saved weather data to {weather_data_filename}")
+
+    risk_results = []
+    for i, met_data in enumerate(weather_data):
+        city = cities[i]
+        timesteps = len(met_data["properties"]["timeseries"])
+        logger.info(f"Fetched data for {city['name']} ({timesteps} timesteps)")
 
         if met_data:
             # 2. Compute Risk (Using the complex FRCM model)
@@ -36,18 +54,36 @@ async def job():
 
             if risk_result:
                 ttf = risk_result["ttf"]
-                logger.info(f"Location: {loc['name']}, TTF: {ttf}")
+                logger.info(f"Location: {city['name']}, TTF: {ttf}")
+                risk_results.append(
+                    {
+                        "city": city["name"],
+                        "ttf": ttf,
+                        "timestamp": str(risk_result["timestamp"]),
+                    }
+                )
 
                 # 3. Save to DB
-                # await save_risk_data(...)
+                await save_risk_data(city, ttf)
             else:
-                logger.warning(f"Calculation failed for {loc['name']}")
+                logger.warning(f"Calculation failed for {city['name']}")
         else:
-            logger.warning(f"Skipping {loc['name']} due to fetch error.")
+            logger.warning(f"Skipping {city['name']} due to fetch error.")
+
+    # Save risk results to a file
+    risk_results_filename = f"output/risk_results_{timestamp}.json"
+    save_to_json(risk_results, risk_results_filename)
+    logger.info(f"Saved risk results to {risk_results_filename}")
 
 
-async def main():
+async def main() -> None:
+    """
+    The main function that runs the intelligence system worker.
+    """
     logger.info("Intelligence System Worker Started.")
+    # Create output directory if it doesn't exist
+    Path("output").mkdir(exist_ok=True)
+    await create_db_and_tables()
 
     while True:
         try:
