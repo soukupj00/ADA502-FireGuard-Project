@@ -1,4 +1,4 @@
-# Use a single stage to guarantee path consistency
+# backend/Dockerfile
 FROM python:3.12-slim-bookworm
 
 # 1. Install uv
@@ -10,28 +10,25 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# 3. Copy dependency files
-COPY pyproject.toml uv.lock ./
-
-# 4. Install dependencies
-# --no-dev: Exclude dev dependencies
-# --no-install-project: Don't install the 'app' package itself, just libs
-RUN uv sync --python 3.12 --no-dev --no-install-project
-
-# 5. Copy application code
-COPY src ./src
-
-# 6. Set PATHs
-# PYTHONPATH includes /app/src so we can do "import app" and "import frcm"
+# 3. Create the virtual environment and set path
+RUN uv venv
 ENV PATH="/app/.venv/bin:$PATH"
+
+# 4. Install Application-Specific Dependencies
+COPY ./backend/pyproject.toml ./backend/uv.lock ./
+RUN uv sync --no-dev
+
+# 5. Copy Application Code
+COPY ./backend/src ./src
+
+# 6. Set the PYTHONPATH to include the 'src' directory
 ENV PYTHONPATH="/app/src"
 
-# 7. Security: Create non-root user
+# 7. Security
 RUN useradd -m fireguard && chown -R fireguard /app
 USER fireguard
 
 EXPOSE 8000
 
 # 8. Run uvicorn
-# FIX: Changed "src.app.main:app" to "app.main:app"
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/.venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
