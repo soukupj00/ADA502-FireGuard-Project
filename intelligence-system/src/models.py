@@ -31,8 +31,10 @@ class WeatherDataReading(Base):
     data: Mapped[dict[str, Any]] = mapped_column(JSON)
 
     def __repr__(self) -> str:
-        return (f"<WeatherDataReading(id={self.id}, location='{self.location_name}', "
-                f"recorded_at='{self.recorded_at}')>")
+        return (
+            f"<WeatherDataReading(id={self.id}, location='{self.location_name}', "
+            f"recorded_at='{self.recorded_at}')>"
+        )
 
 
 class FireRiskReading(Base):
@@ -56,5 +58,7 @@ class FireRiskReading(Base):
     ttf: Mapped[float] = mapped_column(Float)
 
     def __repr__(self) -> str:
-        return (f"<FireRiskReading(id={self.id}, location='{self.location_name}', "
-                f"ttf={self.ttf})>")
+        return (
+            f"<FireRiskReading(id={self.id}, location='{self.location_name}', "
+            f"ttf={self.ttf})>"
+        )

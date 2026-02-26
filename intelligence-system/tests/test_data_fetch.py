@@ -4,7 +4,7 @@ from met_api import fetch_weather
 from risk_calculator import calculate_risk
 
 
-async def test():
+async def test() -> None:
     print("--- Testing Fetch ---")
     # Use Bergen coordinates
     data = await fetch_weather(60.3913, 5.3221)
@@ -25,6 +25,7 @@ async def test():
             print(f"❌ Calculation Crashed: {e}")
     else:
         print("❌ Fetch Failed")
+
 
 if __name__ == "__main__":
     asyncio.run(test())

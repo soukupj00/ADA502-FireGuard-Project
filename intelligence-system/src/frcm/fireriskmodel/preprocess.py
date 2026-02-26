@@ -7,9 +7,7 @@ from frcm.datamodel.model import WeatherData, WeatherDataPoint
 from frcm.fireriskmodel.parameters import delta_t
 
 
-def extract_variable(
-    sorted_data: List[WeatherDataPoint], parameter: str
-) -> List[Any]:
+def extract_variable(sorted_data: List[WeatherDataPoint], parameter: str) -> List[Any]:
     """
     Generic concatenation.
 
