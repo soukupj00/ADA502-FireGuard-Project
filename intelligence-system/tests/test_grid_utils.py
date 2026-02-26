@@ -8,22 +8,22 @@ def test_get_geohash_precision():
     # Precision 5 (User Tier)
     gh5 = get_geohash(lat, lon, precision=5)
     assert len(gh5) == 5
-    assert gh5 == "u4p9x"
+    assert gh5 == "u4ez9"
 
     # Precision 4 (Regional Tier)
     gh4 = get_geohash(lat, lon, precision=4)
     assert len(gh4) == 4
-    assert gh4 == "u4p9"
+    assert gh4 == "u4ez"
 
     # Precision 3 (Coarse Regional Tier)
     gh3 = get_geohash(lat, lon, precision=3)
     assert len(gh3) == 3
-    assert gh3 == "u4p"
+    assert gh3 == "u4e"
 
 
 def test_get_geohash_center():
     """Verify decoding logic."""
-    geohash = "u4p9x"
+    geohash = "u4ez9"
     lat, lon = get_geohash_center(geohash)
 
     # Bergen is roughly 60.39, 5.32
