@@ -75,9 +75,8 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
-      # Add tests if you have them in intelligence-system/tests/
-      # - name: Run Tests
-      #   run: uv run pytest
+      - name: Run Tests
+        run: uv run pytest
 
       - name: Verify Docker Build
         run: docker build . -t fireguard-intelligence:latest

@@ -1,10 +1,7 @@
-import asyncio
 import logging
-from typing import Any, List
+from typing import Any
 
 import httpx
-
-from cities import NORWEGIAN_CITIES, City
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,28 +41,3 @@ async def fetch_weather(lat: float, lon: float) -> Any | None:
         except httpx.HTTPError as e:
             logger.error(f"Failed to fetch MET data: {e}")
             return None
-
-
-async def fetch_all_weather_data() -> List[Any]:
-    """
-    Asynchronously fetches weather data for all Norwegian cities.
-
-    Returns:
-        A list of dictionaries, where each dictionary contains the weather data for
-        a city.
-    """
-    tasks = [
-        fetch_weather(city["lat"], city["lon"]) for city in NORWEGIAN_CITIES
-    ]
-    weather_data = await asyncio.gather(*tasks)
-    return [data for data in weather_data if data is not None]
-
-
-def get_cities() -> List[City]:
-    """
-    Returns the list of Norwegian cities.
-
-    Returns:
-        A list of dictionaries, where each dictionary represents a city.
-    """
-    return NORWEGIAN_CITIES

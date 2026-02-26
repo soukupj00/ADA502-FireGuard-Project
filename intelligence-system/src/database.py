@@ -1,28 +1,107 @@
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, Sequence
 
-from models import Base, FireRiskReading, WeatherDataReading  # Import from local models
-from sqlalchemy import select
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    func,
+    select,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import DeclarativeBase
 
 from config import settings
+from grid_utils import generate_initial_zones
 
-# This part remains specific to the application
+# Database connection
 engine = create_async_engine(settings.DATABASE_URL)
 AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False,
+    autocommit=False, autoflush=False, bind=engine, class_=AsyncSession
 )
+
+
+class Base(DeclarativeBase):
+    """Base class for SQLAlchemy models."""
+
+
+class MonitoredZone(Base):
+    """
+    Represents a geographic zone (grid cell) that we are actively monitoring.
+    """
+
+    __tablename__ = "monitored_zones"
+
+    geohash = Column(String, primary_key=True, index=True)
+    center_lat = Column(Float, nullable=False)
+    center_lon = Column(Float, nullable=False)
+    is_regional = Column(
+        Boolean, default=True
+    )  # True = Tier 1 (Map), False = Tier 2 (User)
+    name = Column(String, nullable=True)  # Optional descriptive name
+    last_updated = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class WeatherDataReading(Base):
+    """SQLAlchemy model for raw weather data readings."""
+
+    __tablename__ = "weather_data_readings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    location_name = Column(String, index=True)  # Can be geohash or city name
+    latitude = Column(Float)
+    longitude = Column(Float)
+    data = Column(JSONB)
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class FireRiskReading(Base):
+    """SQLAlchemy model for fire risk readings."""
+
+    __tablename__ = "fire_risk_readings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    location_name = Column(String, index=True)  # Can be geohash or city name
+    latitude = Column(Float)
+    longitude = Column(Float)
+    ttf = Column(Float)
+    prediction_timestamp = Column(DateTime(timezone=True))
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 async def create_db_and_tables() -> None:
     """Creates the database and tables if they do not exist."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def seed_initial_zones() -> None:
+    """
+    Populates the database with initial regional zones if empty.
+    """
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(MonitoredZone).limit(1))
+        if result.first() is None:
+            initial_zones = generate_initial_zones()
+            for zone_data in initial_zones:
+                zone = MonitoredZone(**zone_data)
+                db.add(zone)
+            await db.commit()
+
+
+async def get_monitored_zones() -> Sequence[Any]:
+    """Returns all active monitored zones."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(MonitoredZone))
+        return result.scalars().all()
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for getting an async database session."""
@@ -30,26 +109,30 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-async def save_weather_data(city: Dict[str, Any], weather_json: Dict[str, Any]) -> None:
-    """Saves the raw weather data for a given city to the database."""
+async def save_weather_data(
+    location_name: str, lat: float, lon: float, weather_json: Dict[str, Any]
+) -> None:
+    """Saves the raw weather data for a given location to the database."""
     async with AsyncSessionLocal() as db:
         db_reading = WeatherDataReading(
-            location_name=city["name"],
-            latitude=city["lat"],
-            longitude=city["lon"],
+            location_name=location_name,
+            latitude=lat,
+            longitude=lon,
             data=weather_json,
         )
         db.add(db_reading)
         await db.commit()
 
 
-async def save_risk_data(city: Dict[str, Any], risk_result: Dict[str, Any]) -> None:
-    """Saves the fire risk data for a given city to the database."""
+async def save_risk_data(
+    location_name: str, lat: float, lon: float, risk_result: Dict[str, Any]
+) -> None:
+    """Saves the fire risk data for a given location to the database."""
     async with AsyncSessionLocal() as db:
         db_reading = FireRiskReading(
-            location_name=city["name"],
-            latitude=city["lat"],
-            longitude=city["lon"],
+            location_name=location_name,
+            latitude=lat,
+            longitude=lon,
             ttf=risk_result["ttf"],
             prediction_timestamp=risk_result["timestamp"],
         )
@@ -59,7 +142,7 @@ async def save_risk_data(city: Dict[str, Any], risk_result: Dict[str, Any]) -> N
 
 async def get_latest_readings(
     location_name: str, limit: int = 1
-) -> Dict[str, Optional[List[Any]]]:
+) -> dict[str, Sequence[Any]]:
     """
     Debug function to get the latest weather and fire risk readings for a location.
     """
