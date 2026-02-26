@@ -1,21 +1,39 @@
+from datetime import datetime
+from typing import Any, List, Tuple
+
 import numpy as np
 
-from frcm.datamodel.model import *
+from frcm.datamodel.model import WeatherData, WeatherDataPoint
 from frcm.fireriskmodel.parameters import delta_t
 
 
-def extract_variable(sorted_data, parameter):
+def extract_variable(sorted_data: List[WeatherDataPoint], parameter: str) -> List[Any]:
     """
-    generic concatenation
+    Generic concatenation.
+
+    Args:
+        sorted_data: A list of sorted WeatherDataPoint objects.
+        parameter: The parameter to extract from each object.
+
+    Returns:
+        A list of the extracted parameters.
     """
-    # obs = [getattr(obj, parameter) for obj in sorted_data_obs]
-    # fct = [getattr(obj, parameter) for obj in sorted_data_fct]
-    # combined = obs + fct
-    extracted = [getattr(obj, parameter) for obj in sorted_data]
-    return extracted
+    return [getattr(obj, parameter) for obj in sorted_data]
 
 
-def clean_nan(data_vector, time_vector):
+def clean_nan(
+    data_vector: List[float], time_vector: List[float]
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Removes NaN values from the data and time vectors.
+
+    Args:
+        data_vector: A list of data points.
+        time_vector: A list of time points.
+
+    Returns:
+        A tuple containing the cleaned data and time vectors.
+    """
     # Treat Data
     nan_indices = np.where(np.isnan(data_vector))
     data_cleaned = np.delete(data_vector, nan_indices)
@@ -24,7 +42,16 @@ def clean_nan(data_vector, time_vector):
     return data_cleaned, time_cleaned
 
 
-def find_data_gap(*args):  # np.array
+def find_data_gap(*args: np.ndarray) -> float:
+    """
+    Finds the largest gap in the data.
+
+    Args:
+        *args: A variable number of numpy arrays.
+
+    Returns:
+        The largest gap in the data.
+    """
     max_delta = []
     for arr in args:
         differences = np.diff(arr)
@@ -32,17 +59,16 @@ def find_data_gap(*args):  # np.array
     return np.max(max_delta)
 
 
-def preprocess(wd: WeatherData):
+def preprocess(
+    wd: WeatherData,
+) -> Tuple[datetime, List[int], np.ndarray, np.ndarray, np.ndarray, float]:
     """
     Transforms the WeatherData domain object into numpy ndarrays
     which contain the interoplated values w.r.t. temperature, humidity, and wind speed,
     also a 'cleaning' w.r.t null-values.
     """
-
     # Should not be necessary, but data is initially sorted according to the timestamps
     sorted_data = sorted(wd.data, key=lambda x: x.timestamp)
-    # sorted_data_obs = sorted(wd.observations.data, key=lambda x: x.timestamp)
-    # sorted_data_fct = sorted(wd.forecast.data, key=lambda x: x.timestamp)
 
     # Combine data
     timestamp_vector = extract_variable(sorted_data, "timestamp")
@@ -50,7 +76,8 @@ def preprocess(wd: WeatherData):
     humidity_vector = extract_variable(sorted_data, "humidity")
     wind_vector = extract_variable(sorted_data, "wind_speed")
 
-    # Convert timestamp vector to a vector containing delta time of adjacent elements in seconds, starting at 0.
+    # Convert timestamp vector to a vector containing delta time of adjacent elements
+    # in seconds, starting at 0.
     timestamp_vector_sec = [
         round((timestamp - timestamp_vector[0]).total_seconds())
         for timestamp in timestamp_vector
@@ -58,7 +85,8 @@ def preprocess(wd: WeatherData):
     # Get start of computation as datetime
     start_time = timestamp_vector[0]
 
-    # Identify position of np.nan values and remove from "parameter"_vector and associated "parameter"_timevector
+    # Identify position of np.nan values and remove from "parameter"_vector and
+    # associated "parameter"_timevector
     # Resulting vectors are used in the np interpolation function (np.interp)
     temp_clean, time_temp_clean = clean_nan(
         data_vector=temp_vector, time_vector=timestamp_vector_sec
@@ -70,13 +98,14 @@ def preprocess(wd: WeatherData):
         data_vector=wind_vector, time_vector=timestamp_vector_sec
     )
 
-    # Create interpolation time vector in seconds. This vector contains all the datapoints for which the np.interp-
-    # function shall provide interpolated values.
+    # Create interpolation time vector in seconds. This vector contains all the
+    # datapoints for which the np.interp-function shall provide interpolated values.
     interpolation_timevector_sec = [
         i for i in range(timestamp_vector_sec[0], timestamp_vector_sec[-1] + 1, delta_t)
     ]
 
-    # Find largest gap in data. Currently only considering temperature and humidity. Delta is given in seconds.
+    # Find largest gap in data. Currently only considering temperature and humidity.
+    # Delta is given in seconds.
     max_time_delta = find_data_gap(time_temp_clean, time_humidity_clean)
 
     # Interpolate all data

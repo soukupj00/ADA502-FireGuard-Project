@@ -1,54 +1,27 @@
 # backend/src/app/database.py
-import os
-from datetime import datetime
+from typing import AsyncGenerator
 
-from sqlalchemy import DateTime, Float, String
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-# Cloud-deployable: Use env variable for connection string
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://user:password@localhost:5432/fireguard_db",
+from app.models import Base  # Import from local models
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
 )
 
+from config import settings
+
 # Async engine setup
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(settings.DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-class FireRiskRecord(Base):
-    """
-    Table for persistent storage of weather data and computed fire risks.
-    """
-
-    __tablename__ = "fire_risk_records"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    location_id: Mapped[str] = mapped_column(String, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    # Weather Inputs (Harvested Data) [cite: 24]
-    temperature: Mapped[float] = mapped_column(Float)
-    humidity: Mapped[float] = mapped_column(Float)
-    wind_speed: Mapped[float] = mapped_column(Float)
-
-    # Computed Outputs
-    risk_score: Mapped[float] = mapped_column(Float)
-    time_to_flashover: Mapped[float] = mapped_column(Float)
-
-
-async def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency injection for database sessions."""
     async with AsyncSessionLocal() as session:
         yield session
 
 
-async def init_db():
+async def init_db() -> None:
     """Creates database tables on application startup."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

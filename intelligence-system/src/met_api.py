@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import httpx
 
@@ -16,7 +17,18 @@ HEADERS = {
 }
 
 
-async def fetch_weather(lat: float, lon: float):
+async def fetch_weather(lat: float, lon: float) -> Any | None:
+    """
+    Asynchronously fetches weather data for a given latitude and longitude from the
+    MET.no API.
+
+    Args:
+        lat: The latitude of the location.
+        lon: The longitude of the location.
+
+    Returns:
+        A dictionary containing the weather data, or None if an error occurs.
+    """
     params = {"lat": lat, "lon": lon}
 
     async with httpx.AsyncClient() as client:

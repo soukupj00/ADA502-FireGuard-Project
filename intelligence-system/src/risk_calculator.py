@@ -1,6 +1,6 @@
 import datetime
 import logging
-from zoneinfo import ZoneInfo
+from typing import Any, Dict
 
 from frcm.datamodel import model as dm
 from frcm.fireriskmodel.compute import compute
@@ -8,7 +8,7 @@ from frcm.fireriskmodel.compute import compute
 logger = logging.getLogger(__name__)
 
 
-def transform_met_data_to_model(met_json: dict) -> dm.WeatherData:
+def transform_met_data_to_model(met_json: Dict[str, Any]) -> dm.WeatherData:
     """
     Parses the raw JSON from MET.no and converts it into the
     internal WeatherData object required by the FRCM compute function.
@@ -28,7 +28,7 @@ def transform_met_data_to_model(met_json: dict) -> dm.WeatherData:
             timestamp=dt,
             temperature=instant_details.get("air_temperature"),
             humidity=instant_details.get("relative_humidity"),
-            wind_speed=instant_details.get("wind_speed", 0.0)
+            wind_speed=instant_details.get("wind_speed", 0.0),
         )
         data_points.append(dp)
 
@@ -36,7 +36,7 @@ def transform_met_data_to_model(met_json: dict) -> dm.WeatherData:
     return dm.WeatherData(data=data_points)
 
 
-def calculate_risk(met_json: dict):
+def calculate_risk(met_json: Dict[str, Any]) -> Dict[str, Any] | None:
     """
     Orchestrates the risk calculation:
     MET JSON -> WeatherData -> Compute() -> Result
@@ -51,9 +51,10 @@ def calculate_risk(met_json: dict):
 
         # 3. Extract the most relevant result
         # The compute function returns a simulation for the whole forecast period.
-        # We take the first element as the "current" risk.
-        if prediction_result.firerisks:
-            current_risk = prediction_result.firerisks[0]
+        # We take the second element as the "current" risk, as the first is
+        # based on initial hardcoded parameters.
+        if prediction_result.firerisks and len(prediction_result.firerisks) > 1:
+            current_risk = prediction_result.firerisks[1]
 
             return {
                 "timestamp": current_risk.timestamp,

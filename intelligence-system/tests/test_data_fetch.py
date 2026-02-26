@@ -3,7 +3,8 @@ import asyncio
 from met_api import fetch_weather
 from risk_calculator import calculate_risk
 
-async def test():
+
+async def test() -> None:
     print("--- Testing Fetch ---")
     # Use Bergen coordinates
     data = await fetch_weather(60.3913, 5.3221)
@@ -16,7 +17,7 @@ async def test():
         try:
             result = calculate_risk(data)
             if result:
-                print(f"Calculation Successful!")
+                print("Calculation Successful!")
                 print(f"Time to Flashover (TTF): {result['ttf']}")
             else:
                 print("❌ Calculation returned None")
@@ -24,6 +25,7 @@ async def test():
             print(f"❌ Calculation Crashed: {e}")
     else:
         print("❌ Fetch Failed")
+
 
 if __name__ == "__main__":
     asyncio.run(test())
