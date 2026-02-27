@@ -1,0 +1,21 @@
+repos:
+  # --- Backend & Intelligence System (Python) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.4 # Run 'pre-commit autoupdate' to get the latest
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+      - id: ruff-format
+
+  # --- Frontend (Node.js / React) ---
+  - repo: local
+    hooks:
+      - id: eslint-frontend
+        name: ESLint (Frontend)
+        # Drops into the frontend folder and runs eslint with auto-fix
+        entry: bash -c 'cd frontend && npx eslint . --fix'
+        language: system
+        # Only trigger this hook if JS/TS files in the frontend folder are modified
+        files: ^frontend/.*\.(ts|tsx|js|jsx)$
+        # We pass false so it lints the whole frontend project, avoiding relative pathing errors
+        pass_filenames: false
