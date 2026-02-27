@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from frcm.datamodel import model as dm
 from frcm.fireriskmodel.compute import compute
@@ -66,3 +66,48 @@ def calculate_risk(met_json: Dict[str, Any]) -> Dict[str, Any] | None:
     except Exception as e:
         logger.error(f"Error in risk calculation: {e}")
         return None
+
+
+def calculate_risk_score(ttf: float) -> Tuple[float, str]:
+    """
+    Calculates a normalized risk score (0-100) and
+    category based on Time To Flashover (TTF).
+
+    TTF is in minutes. Lower TTF means higher risk.
+
+    Args:
+        ttf: Time To Flashover in minutes.
+
+    Returns:
+        A tuple containing:
+        - risk_score: A float between 0 and 100 (100 = Extreme Risk).
+        - risk_category: A string description (Low, Moderate, High, Extreme).
+    """
+    if ttf <= 0:
+        return 100.0, "Extreme"
+
+    # Define thresholds
+    # These are heuristic values and can be tuned.
+    if ttf < 5:
+        # Extreme Risk: TTF < 5 mins
+        # Map 0-5 mins to 80-100 score
+        score = 100 - (ttf / 5) * 20
+        category = "Extreme"
+    elif ttf < 15:
+        # High Risk: 5-15 mins
+        # Map 5-15 mins to 60-80 score
+        score = 80 - ((ttf - 5) / 10) * 20
+        category = "High"
+    elif ttf < 30:
+        # Moderate Risk: 15-30 mins
+        # Map 15-30 mins to 30-60 score
+        score = 60 - ((ttf - 15) / 15) * 30
+        category = "Moderate"
+    else:
+        # Low Risk: > 30 mins
+        # Map 30+ mins to 0-30 score
+        # Decay function: score approaches 0 as ttf increases
+        score = max(0.0, 30 - ((ttf - 30) / 30) * 30)
+        category = "Low"
+
+    return round(score, 1), category
