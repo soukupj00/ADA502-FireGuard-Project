@@ -1,37 +1,46 @@
-from fastapi import APIRouter
-from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import Pydantic models from the new schemas file
-from app.schemas import FireRiskRequest, FireRiskResponse
+from app.db.database import get_db
+from app.db.models import CurrentFireRisk
+from app.schemas import FireRiskReadingSchema
+from app.services.risk_service import (
+    get_latest_risk_by_coords,
+    get_latest_risk_reading,
+)
 
 router = APIRouter(prefix="/api/v1/risk", tags=["Fire Risk"])
 
 
-@router.post("/calculate", response_model=FireRiskResponse)
-async def calculate_fire_risk(payload: FireRiskRequest) -> FireRiskResponse:
+@router.get("/{geohash}", response_model=FireRiskReadingSchema)
+async def get_risk_by_geohash(
+    geohash: str, db: AsyncSession = Depends(get_db)
+) -> CurrentFireRisk:
     """
-    Calculates a simplified fire risk based on weather parameters.
-    
-    This endpoint provides a placeholder implementation for fire risk calculation.
+    Get the latest fire risk reading for a specific geohash.
     """
-    # Simple placeholder logic for risk calculation
-    # In a real application, this would involve a complex model
-    risk_score = (payload.temperature / 100) + (payload.humidity / 100) - (payload.wind_speed / 100)
-    risk_score = max(0, min(1, risk_score))  # Clamp between 0 and 1
+    reading = await get_latest_risk_reading(db, geohash)
 
-    time_to_flashover = 600 * (1 - risk_score)  # Inverse relationship
+    if not reading:
+        raise HTTPException(
+            status_code=404, detail="Risk data not found for this location"
+        )
 
-    if risk_score > 0.75:
-        recommendation = "High risk: Evacuation may be necessary. Monitor official alerts."
-    elif risk_score > 0.5:
-        recommendation = "Moderate risk: Be prepared. Clear flammable materials from around your home."
-    else:
-        recommendation = "Low risk: Stay informed and practice fire safety."
+    return reading
 
-    # Return a response that matches the FireRiskResponse model
-    return FireRiskResponse(
-        risk_score=risk_score,
-        time_to_flashover=time_to_flashover,
-        recommendation=recommendation,
-        timestamp=datetime.now(timezone.utc),
-    )
+
+@router.get("/coords", response_model=FireRiskReadingSchema)
+async def get_risk_by_coords(
+    latitude: float, longitude: float, db: AsyncSession = Depends(get_db)
+) -> CurrentFireRisk:
+    """
+    Get the latest fire risk reading for a location by coordinates.
+    """
+    reading = await get_latest_risk_by_coords(db, latitude, longitude)
+
+    if not reading:
+        raise HTTPException(
+            status_code=404, detail="Risk data not found for this location"
+        )
+
+    return reading

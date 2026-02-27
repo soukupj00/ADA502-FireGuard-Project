@@ -15,11 +15,11 @@ RUN uv venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 # 4. Install Application-Specific Dependencies
-COPY ./backend/pyproject.toml ./backend/uv.lock ./
+COPY ./pyproject.toml ./uv.lock ./
 RUN uv sync --no-dev
 
 # 5. Copy Application Code
-COPY ./backend/src ./src
+COPY ./src ./src
 
 # 6. Set the PYTHONPATH to include the 'src' directory
 ENV PYTHONPATH="/app/src"
