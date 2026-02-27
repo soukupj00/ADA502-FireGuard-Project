@@ -1,7 +1,7 @@
-from datetime import datetime, timezone  # Import timezone
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, String
+from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -11,54 +11,77 @@ class Base(DeclarativeBase):
     pass
 
 
+class MonitoredZone(Base):
+    """
+    Represents a geographic zone (grid cell) that we are actively monitoring.
+    """
+
+    __tablename__ = "monitored_zones"
+
+    geohash: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    center_lat: Mapped[float] = mapped_column(Float, nullable=False)
+    center_lon: Mapped[float] = mapped_column(Float, nullable=False)
+    is_regional: Mapped[bool] = mapped_column(
+        Boolean, default=True
+    )  # True = Tier 1 (Map), False = Tier 2 (User)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class WeatherDataReading(Base):
     """
-    Represents a single reading of raw weather data from an external API,
-    stored in a JSON format for flexibility and future analysis.
+    Represents a single reading of raw weather data from an external API.
     """
 
     __tablename__ = "weather_data_readings"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     location_name: Mapped[str] = mapped_column(String, index=True)
     latitude: Mapped[float] = mapped_column(Float)
     longitude: Mapped[float] = mapped_column(Float)
-    recorded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),  # Tell SQLAlchemy to expect timezone-aware datetimes
-        default=lambda: datetime.now(timezone.utc),  # Use a timezone-aware default
-        index=True,
-    )
     data: Mapped[dict[str, Any]] = mapped_column(JSON)
-
-    def __repr__(self) -> str:
-        return (
-            f"<WeatherDataReading(id={self.id}, location='{self.location_name}', "
-            f"recorded_at='{self.recorded_at}')>"
-        )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class FireRiskReading(Base):
     """
-    Represents the calculated fire risk for a specific location at a given time,
-    based on weather data and the fire risk calculation model.
+    Represents the calculated fire risk for a specific location (History).
     """
 
     __tablename__ = "fire_risk_readings"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     location_name: Mapped[str] = mapped_column(String, index=True)
     latitude: Mapped[float] = mapped_column(Float)
     longitude: Mapped[float] = mapped_column(Float)
-    recorded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),  # Tell SQLAlchemy to expect timezone-aware datetimes
-        default=lambda: datetime.now(timezone.utc),  # Use a timezone-aware default
-        index=True,
-    )
-    prediction_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ttf: Mapped[float] = mapped_column(Float)
+    risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    risk_category: Mapped[str | None] = mapped_column(String, nullable=True)
+    prediction_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
-    def __repr__(self) -> str:
-        return (
-            f"<FireRiskReading(id={self.id}, location='{self.location_name}', "
-            f"ttf={self.ttf})>"
-        )
+
+class CurrentFireRisk(Base):
+    """
+    Stores the MOST RECENT fire risk calculation for each zone.
+    This table is optimized for fast lookups by the backend API.
+    """
+
+    __tablename__ = "current_fire_risks"
+
+    geohash: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    ttf: Mapped[float] = mapped_column(Float)
+    risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    risk_category: Mapped[str | None] = mapped_column(String, nullable=True)
+    prediction_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

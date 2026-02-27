@@ -1,6 +1,7 @@
 # intelligence-system/src/main.py
 import asyncio
 import logging
+from typing import Any
 
 from config import settings
 from db.database import (
@@ -11,25 +12,20 @@ from db.database import (
     save_weather_data,
     seed_initial_zones,
 )
+from utils.fire_risk_service import calculate_risk
 from utils.met_api import fetch_weather
-from utils.risk_calculator import calculate_risk
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("IntelligenceSystem")
 
 
-async def job() -> None:
+async def process_zone(zone: Any, semaphore: asyncio.Semaphore) -> None:
     """
-    Fetches weather data for all monitored zones, calculates fire risk,
-    and saves the results to the database.
+    Fetches weather, calculates risk, and saves data for a single zone.
+    Uses semaphore to limit concurrency.
     """
-    logger.info("Starting fetch cycle...")
-
-    monitored_zones = await get_monitored_zones()
-    logger.info(f"Found {len(monitored_zones)} zones to monitor.")
-
-    for zone in monitored_zones:
+    async with semaphore:
         logger.info(f"Processing zone: {zone.name} ({zone.geohash})")
 
         # 1. Fetch weather for the center of the zone
@@ -37,7 +33,7 @@ async def job() -> None:
 
         if not met_data:
             logger.warning(f"Skipping zone {zone.geohash} due to fetch error.")
-            continue
+            return
 
         # Save raw weather data to the database
         await save_weather_data(
@@ -62,6 +58,28 @@ async def job() -> None:
             )
         else:
             logger.warning(f"Risk calculation failed for zone {zone.geohash}")
+
+
+async def job() -> None:
+    """
+    Fetches weather data for all monitored zones, calculates fire risk,
+    and saves the results to the database.
+    """
+    logger.info("Starting fetch cycle...")
+
+    monitored_zones = await get_monitored_zones()
+    logger.info(f"Found {len(monitored_zones)} zones to monitor.")
+
+    # Limit concurrency to avoid overloading MET API or DB connection pool
+    semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_FETCHES)
+
+    # Create tasks for all zones
+    tasks = [process_zone(zone, semaphore) for zone in monitored_zones]
+
+    # Run tasks concurrently
+    await asyncio.gather(*tasks)
+
+    logger.info("Fetch cycle completed.")
 
     # --- Debug Function Call ---
     # Fetch and print the latest reading for a sample zone

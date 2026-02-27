@@ -10,7 +10,7 @@ from sqlalchemy import (
     func,
     select,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from config import settings
+from utils.fire_risk_service import calculate_risk_score
 from utils.grid_utils import generate_initial_zones
 
 # Database connection
@@ -63,7 +64,7 @@ class WeatherDataReading(Base):
 
 
 class FireRiskReading(Base):
-    """SQLAlchemy model for fire risk readings."""
+    """SQLAlchemy model for fire risk readings (History)."""
 
     __tablename__ = "fire_risk_readings"
 
@@ -72,8 +73,30 @@ class FireRiskReading(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     ttf = Column(Float)
+    risk_score = Column(Float, nullable=True)
+    risk_category = Column(String, nullable=True)
     prediction_timestamp = Column(DateTime(timezone=True))
     recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CurrentFireRisk(Base):
+    """
+    Stores the MOST RECENT fire risk calculation for each zone.
+    This table is optimized for fast lookups by the backend API.
+    """
+
+    __tablename__ = "current_fire_risks"
+
+    geohash = Column(String, primary_key=True, index=True)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    ttf = Column(Float)
+    risk_score = Column(Float, nullable=True)
+    risk_category = Column(String, nullable=True)
+    prediction_timestamp = Column(DateTime(timezone=True))
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 async def create_db_and_tables() -> None:
@@ -127,16 +150,50 @@ async def save_weather_data(
 async def save_risk_data(
     location_name: str, lat: float, lon: float, risk_result: Dict[str, Any]
 ) -> None:
-    """Saves the fire risk data for a given location to the database."""
+    """
+    Saves the fire risk data to the history table AND updates the current risk table.
+    """
+    # Calculate risk score and category
+    ttf = risk_result["ttf"]
+    risk_score, risk_category = calculate_risk_score(ttf)
+
     async with AsyncSessionLocal() as db:
+        # 1. Insert into History Table
         db_reading = FireRiskReading(
             location_name=location_name,
             latitude=lat,
             longitude=lon,
-            ttf=risk_result["ttf"],
+            ttf=ttf,
+            risk_score=risk_score,
+            risk_category=risk_category,
             prediction_timestamp=risk_result["timestamp"],
         )
         db.add(db_reading)
+
+        # 2. Insert into Current Risk Table
+        stmt = insert(CurrentFireRisk).values(
+            geohash=location_name,
+            latitude=lat,
+            longitude=lon,
+            ttf=ttf,
+            risk_score=risk_score,
+            risk_category=risk_category,
+            prediction_timestamp=risk_result["timestamp"],
+        )
+
+        # If geohash exists, update the values
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["geohash"],
+            set_={
+                "ttf": stmt.excluded.ttf,
+                "risk_score": stmt.excluded.risk_score,
+                "risk_category": stmt.excluded.risk_category,
+                "prediction_timestamp": stmt.excluded.prediction_timestamp,
+                "updated_at": func.now(),
+            },
+        )
+
+        await db.execute(stmt)
         await db.commit()
 
 
