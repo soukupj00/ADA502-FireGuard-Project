@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FireRiskRequest(BaseModel):
@@ -55,8 +55,7 @@ class MonitoredZoneSchema(BaseModel):
     name: Optional[str] = None
     last_updated: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FireRiskReadingSchema(BaseModel):
@@ -71,8 +70,7 @@ class FireRiskReadingSchema(BaseModel):
     prediction_timestamp: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SubscriptionRequest(BaseModel):
