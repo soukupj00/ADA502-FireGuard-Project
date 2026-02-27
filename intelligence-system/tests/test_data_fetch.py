@@ -1,7 +1,7 @@
 import asyncio
 
-from met_api import fetch_weather
-from risk_calculator import calculate_risk
+from utils.met_api import fetch_weather
+from utils.risk_calculator import calculate_risk
 
 
 async def test() -> None:

@@ -2,7 +2,8 @@
 import asyncio
 import logging
 
-from database import (
+from config import settings
+from db.database import (
     create_db_and_tables,
     get_latest_readings,
     get_monitored_zones,
@@ -10,8 +11,8 @@ from database import (
     save_weather_data,
     seed_initial_zones,
 )
-from met_api import fetch_weather
-from risk_calculator import calculate_risk
+from utils.met_api import fetch_weather
+from utils.risk_calculator import calculate_risk
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +24,7 @@ async def job() -> None:
     Fetches weather data for all monitored zones, calculates fire risk,
     and saves the results to the database.
     """
-    logger.info("Starting 15-minute cycle...")
+    logger.info("Starting fetch cycle...")
 
     monitored_zones = await get_monitored_zones()
     logger.info(f"Found {len(monitored_zones)} zones to monitor.")
@@ -83,8 +84,11 @@ async def main() -> None:
     while True:
         try:
             await job()
-            logger.info("Sleeping for 15 minutes...")
-            await asyncio.sleep(900)
+            logger.info(
+                "Sleeping for %s seconds...",
+                settings.FETCH_INTERVAL_SECONDS,
+            )
+            await asyncio.sleep(settings.FETCH_INTERVAL_SECONDS)
         except Exception as e:
             logger.error(f"Critical Worker Error: {e}", exc_info=True)
             await asyncio.sleep(60)

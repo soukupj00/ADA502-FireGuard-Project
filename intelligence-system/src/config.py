@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     """Manages application settings and configurations."""
 
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost/fireguard"
+    FETCH_INTERVAL_SECONDS: int = 3600
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
