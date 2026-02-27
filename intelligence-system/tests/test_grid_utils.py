@@ -1,4 +1,4 @@
-from grid_utils import generate_initial_zones, get_geohash, get_geohash_center
+from utils.grid_utils import generate_initial_zones, get_geohash, get_geohash_center
 
 
 def test_get_geohash_precision():

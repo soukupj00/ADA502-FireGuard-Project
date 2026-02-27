@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from database import MonitoredZone
+from db.database import MonitoredZone
 from main import job
 
 
@@ -32,10 +32,10 @@ async def test_job_cycle(mock_db_session):
     # We patch AsyncSessionLocal in 'database' so that save_weather_data uses our mock
     # session. We also patch get_monitored_zones to avoid a DB query for zones.
     with (
-        patch("database.AsyncSessionLocal", return_value=mock_db_session),
+        patch("db.database.AsyncSessionLocal", return_value=mock_db_session),
         patch("main.get_monitored_zones", return_value=[mock_zone]),
-        patch("met_api.fetch_weather", return_value=mock_met_data),
-        patch("risk_calculator.calculate_risk", return_value=mock_risk_result),
+        patch("main.fetch_weather", return_value=mock_met_data),
+        patch("main.calculate_risk", return_value=mock_risk_result),
     ):
         await job()
 

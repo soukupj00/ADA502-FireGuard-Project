@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from database import (
+from db.database import (
     MonitoredZone,
     get_monitored_zones,
     save_risk_data,
@@ -15,7 +15,7 @@ async def test_save_weather_data(mock_db_session):
     """Verify that weather data is saved correctly."""
 
     # Mock the AsyncSessionLocal to return our mock session
-    with patch("database.AsyncSessionLocal", return_value=mock_db_session):
+    with patch("db.database.AsyncSessionLocal", return_value=mock_db_session):
         await save_weather_data(
             location_name="u4p9x", lat=60.39, lon=5.32, weather_json={"temp": 10}
         )
@@ -38,7 +38,7 @@ async def test_save_weather_data(mock_db_session):
 async def test_save_risk_data(mock_db_session):
     """Verify that risk data is saved correctly."""
 
-    with patch("database.AsyncSessionLocal", return_value=mock_db_session):
+    with patch("db.database.AsyncSessionLocal", return_value=mock_db_session):
         await save_risk_data(
             location_name="u4p9x",
             lat=60.39,
@@ -67,7 +67,7 @@ async def test_get_monitored_zones(mock_db_session):
         mock_zone
     ]
 
-    with patch("database.AsyncSessionLocal", return_value=mock_db_session):
+    with patch("db.database.AsyncSessionLocal", return_value=mock_db_session):
         zones = await get_monitored_zones()
 
         assert len(zones) == 1

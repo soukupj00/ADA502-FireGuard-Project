@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from config import settings
-from grid_utils import generate_initial_zones
+from utils.grid_utils import generate_initial_zones
 
 # Database connection
 engine = create_async_engine(settings.DATABASE_URL)
