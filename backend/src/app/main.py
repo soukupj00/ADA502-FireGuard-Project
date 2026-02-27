@@ -4,15 +4,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import init_db
-from app.routers import risk_router
+from app.routers import risk_router, subscription, zones
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize resources (e.g., ML models, DB connections)
     print("FireGuard API starting up...")
-    await init_db()
+    # No need to init_db() here as Intelligence System handles schema
     yield
     # Shutdown: Clean up resources
     print("FireGuard API shutting down...")
@@ -48,6 +47,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(risk_router.router)
+    app.include_router(zones.router)
+    app.include_router(subscription.router)
 
     return app
 
