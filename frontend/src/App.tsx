@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
+import TestRiskAPI from './components/TestRiskAPI.tsx'
 import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
+  const geohash = "u67" //erstmal zum Testen
 
   return (
     <>
@@ -17,6 +19,7 @@ function App() {
         </a>
       </div>
       <h1>Vite + React</h1>
+      <TestRiskAPI />
       <div className="card">
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
