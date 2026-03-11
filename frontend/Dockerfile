@@ -9,6 +9,7 @@ RUN npm ci
 FROM base AS development
 COPY . .
 EXPOSE 5173
+# Expose the host flag so it binds to 0.0.0.0
 CMD ["npm", "run", "dev", "--", "--host"]
 
 # STAGE 3: Build (Intermediate step for Prod)

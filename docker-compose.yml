@@ -55,7 +55,7 @@ services:
         - action: rebuild
           path: ./intelligence-system/pyproject.toml
 
-  # 4. React Frontend
+    # 4. React Frontend
   frontend:
     build:
       context: ./frontend
@@ -67,6 +67,14 @@ services:
       - VITE_API_URL=http://localhost:8000
     depends_on:
       - backend
+    # ADD THIS SECTION BELOW:
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      # Prevent node_modules from being overwritten by the host
+      - /app/node_modules
 
 volumes:
   postgres_data_dev:
