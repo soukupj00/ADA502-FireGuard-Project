@@ -54,10 +54,12 @@ def generate_initial_zones() -> List[dict]:
     lon_min, lon_max = 4.6, 31.1
 
     # Step size in degrees.
-    # For precision 3 (approx 156km x 156km), we need larger steps.
-    # 1.5 degrees lat is ~166km. 3 degrees lon is ~166km at 60N.
-    lat_step = 1.5
-    lon_step = 3.0
+    # We use a step size smaller than the dimensions of a 3-char geohash
+    # to ensure we don't skip any blocks.
+    # 3-char geohash is approx 1.4 deg lat x 2.8 deg lon at 60N.
+    # Using 0.5 and 1.0 ensures full coverage (oversampling is handled by deduplication)
+    lat_step = 0.5
+    lon_step = 1.0
 
     current_lat = lat_min
     while current_lat <= lat_max:

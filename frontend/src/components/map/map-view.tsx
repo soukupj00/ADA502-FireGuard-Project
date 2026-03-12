@@ -1,17 +1,18 @@
-import { MapContainer, TileLayer, Rectangle, Popup } from 'react-leaflet';
+import {MapContainer, Popup, Rectangle, TileLayer} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { LatLngExpression, LatLngBoundsExpression } from 'leaflet';
-import { useZones } from '@/hooks/use-zones';
-import { useMemo } from 'react';
+import type {LatLngBoundsExpression, LatLngExpression} from 'leaflet';
+import {useZones} from '@/hooks/use-zones';
+import {useMemo} from 'react';
 import Geohash from 'latlon-geohash';
+import type {MapFeature, SkippedFeature} from '@/types/map';
 
 interface MapViewProps {
   center?: LatLngExpression;
   zoom?: number;
 }
 
-export function MapView({ center = [58.359375, 10.546875] as LatLngExpression, zoom = 6 }: MapViewProps) {
-  const { zones, isLoading, isError } = useZones();
+export function MapView({center = [58.359375, 10.546875] as LatLngExpression, zoom = 6}: MapViewProps) {
+  const {zones, isLoading, isError} = useZones();
 
   const getColor = (riskScore: number) => {
     if (riskScore >= 80) return '#ef4444'; // red-500
@@ -26,34 +27,49 @@ export function MapView({ center = [58.359375, 10.546875] as LatLngExpression, z
     console.group('Map Data Debug');
     console.log('Total features:', zones.features.length);
 
-    const processedData = zones.features.map((feature, index) => {
-      const { geohash, risk_score, name, risk_category } = feature.properties;
-      
-      if (!geohash) {
-          console.warn(`Feature at index ${index} missing geohash`, feature);
-          return null;
+    const skippedFeatures: SkippedFeature[] = [];
+
+    const processedData = zones.features.map((feature, index): MapFeature | null => {
+      const {geohash, risk_score, name, risk_category} = feature.properties;
+
+      // Skip if geohash is missing or if risk_score is null (sea/no data)
+      if (!geohash || risk_score === null) {
+        skippedFeatures.push({
+          index,
+          reason: !geohash ? 'Missing geohash' : 'Null risk_score',
+          feature: feature.properties
+        });
+
+        if (!geohash) console.warn(`Feature at index ${index} missing geohash`, feature);
+        return null;
       }
 
       try {
-          const bounds = Geohash.bounds(geohash);
+        const bounds = Geohash.bounds(geohash);
 
-          const leafletBounds: LatLngBoundsExpression = [
-            [bounds.sw.lat, bounds.sw.lon],
-            [bounds.ne.lat, bounds.ne.lon]
-          ];
-    
-          return {
-            id: geohash,
-            name,
-            bounds: leafletBounds,
-            riskScore: risk_score,
-            riskCategory: risk_category
-          };
+        const leafletBounds: LatLngBoundsExpression = [
+          [bounds.sw.lat, bounds.sw.lon],
+          [bounds.ne.lat, bounds.ne.lon]
+        ];
+
+        return {
+          id: geohash,
+          name,
+          bounds: leafletBounds,
+          riskScore: risk_score,
+          riskCategory: risk_category ?? 'N/A'
+        };
       } catch (e) {
-          console.error(`Invalid geohash: ${geohash}`, e);
-          return null;
+        console.error(`Invalid geohash: ${geohash}`, e);
+        return null;
       }
-    }).filter((item): item is NonNullable<typeof item> => item !== null);
+    }).filter((item): item is MapFeature => item !== null);
+
+    if (skippedFeatures.length > 0) {
+      console.groupCollapsed(`Skipped Features (${skippedFeatures.length})`);
+      console.table(skippedFeatures);
+      console.groupEnd();
+    }
 
     console.log('Processed map data:', processedData);
     console.groupEnd();
@@ -63,39 +79,40 @@ export function MapView({ center = [58.359375, 10.546875] as LatLngExpression, z
 
   if (isLoading) {
     return (
-        <div className="h-full w-full flex items-center justify-center bg-muted/20 min-h-[400px] animate-pulse">
-            <span className="text-muted-foreground font-medium">Loading map data...</span>
-        </div>
+      <div className="h-full w-full flex items-center justify-center bg-muted/20 min-h-100 animate-pulse">
+        <span className="text-muted-foreground font-medium">Loading map data...</span>
+      </div>
     );
   }
 
   if (isError) {
     return (
-        <div className="h-full w-full flex flex-col items-center justify-center bg-red-50 text-red-500 p-4 text-center min-h-[400px]">
-            <p className="font-bold">Error loading map data</p>
-            <p className="text-sm">Please try again later.</p>
-        </div>
+      <div
+        className="h-full w-full flex flex-col items-center justify-center bg-red-50 text-red-500 p-4 text-center min-h-100">
+        <p className="font-bold">Error loading map data</p>
+        <p className="text-sm">Please try again later.</p>
+      </div>
     );
   }
 
   return (
     <div className="h-full w-full relative z-0">
-      <MapContainer 
-        center={center} 
-        zoom={zoom} 
-        scrollWheelZoom={true} 
-        style={{ height: '100%', width: '100%', minHeight: '400px' }}
+      <MapContainer
+        center={center}
+        zoom={zoom}
+        scrollWheelZoom={true}
+        style={{height: '100%', width: '100%', minHeight: '400px'}}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
+
         {mapData.map((data) => (
           <Rectangle
             key={data.id}
             bounds={data.bounds}
-            pathOptions={{ 
+            pathOptions={{
               color: getColor(data.riskScore),
               fillColor: getColor(data.riskScore),
               fillOpacity: 0.5,
@@ -104,19 +121,19 @@ export function MapView({ center = [58.359375, 10.546875] as LatLngExpression, z
             }}
           >
             <Popup>
-              <div className="text-sm p-1 min-w-[150px]">
+              <div className="text-sm p-1 min-w-37.5">
                 <h3 className="font-semibold text-base mb-2">{data.name}</h3>
                 <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-                    <span className="text-muted-foreground font-medium">Geohash:</span>
-                    <span className="font-mono text-right">{data.id}</span>
-                    
-                    <span className="text-muted-foreground font-medium">Risk Score:</span>
-                    <span className={`font-bold text-right ${data.riskScore > 50 ? 'text-red-600' : 'text-green-600'}`}>
+                  <span className="text-muted-foreground font-medium">Geohash:</span>
+                  <span className="font-mono text-right">{data.id}</span>
+
+                  <span className="text-muted-foreground font-medium">Risk Score:</span>
+                  <span className={`font-bold text-right ${data.riskScore > 50 ? 'text-red-600' : 'text-green-600'}`}>
                         {data.riskScore.toFixed(1)}
                     </span>
-                    
-                    <span className="text-muted-foreground font-medium">Category:</span>
-                    <span className="capitalize text-right">{data.riskCategory}</span>
+
+                  <span className="text-muted-foreground font-medium">Category:</span>
+                  <span className="capitalize text-right">{data.riskCategory}</span>
                 </div>
               </div>
             </Popup>
