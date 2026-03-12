@@ -7,7 +7,7 @@ export function useZones(regionalOnly: boolean = true) {
         ['/zones', regionalOnly],
         () => fetchZones(regionalOnly),
         {
-            refreshInterval: 60000, // Refresh every minute
+            refreshInterval: 60*60000, // Refresh every hour
             revalidateOnFocus: false
         }
     );

@@ -8,8 +8,8 @@ export interface GeoJSONFeature {
         geohash: string;
         name: string;
         is_regional: boolean;
-        risk_score: number;
-        risk_category: string;
+        risk_score: number | null;
+        risk_category: string | null;
         last_updated: string;
     };
 }
