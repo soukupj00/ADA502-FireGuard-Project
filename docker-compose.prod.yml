@@ -16,6 +16,7 @@ services:
     restart: always
     depends_on:
       - db
+      - keycloak
     environment:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
 
@@ -39,6 +40,16 @@ services:
       - "80:80"
     depends_on:
       - backend
+
+  # 4. Keycloak
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
 
 volumes:
   postgres_data:
