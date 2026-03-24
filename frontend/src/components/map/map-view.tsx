@@ -10,7 +10,6 @@ import type { LatLngBoundsExpression, LatLngExpression } from "leaflet"
 import L from "leaflet"
 import { useZones } from "@/hooks/use-zones"
 import { useEffect, useMemo } from "react"
-// @ts-expect-error - latlon-geohash lacks type definitions
 import Geohash from "latlon-geohash"
 import type { MapFeature } from "@/types/map"
 
@@ -103,7 +102,7 @@ export function MapView({
 
   if (isLoading) {
     return (
-      <div className="flex h-full min-h-[400px] w-full animate-pulse items-center justify-center bg-muted/20">
+      <div className="flex h-full min-h-100 w-full animate-pulse items-center justify-center bg-muted/20">
         <span className="font-medium text-muted-foreground">
           Loading map data...
         </span>
@@ -113,7 +112,7 @@ export function MapView({
 
   if (isError) {
     return (
-      <div className="flex h-full min-h-[400px] w-full flex-col items-center justify-center bg-red-50 p-4 text-center text-red-500">
+      <div className="flex h-full min-h-100 w-full flex-col items-center justify-center bg-red-50 p-4 text-center text-red-500">
         <p className="font-bold">Error loading map data</p>
         <p className="text-sm">Please try again later.</p>
       </div>
@@ -149,7 +148,7 @@ export function MapView({
             }}
           >
             <Popup>
-              <div className="min-w-[150px] p-1 text-sm">
+              <div className="min-w-37.5 p-1 text-sm">
                 <h3 className="mb-2 text-base font-semibold">
                   {data.name}
                   {!data.isRegional && (
