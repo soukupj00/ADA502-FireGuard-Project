@@ -8,8 +8,20 @@ from app.services.risk_service import (
     get_latest_risk_by_coords,
     get_latest_risk_reading,
 )
+from app.auth import get_current_user
+
+
 
 router = APIRouter(prefix="/api/v1/risk", tags=["Fire Risk"])
+
+@router.get("/secure-data")
+async def root(user: dict = Depends(get_current_user)):
+    """
+    Checks the current user
+    :param user:
+    :return:
+    """
+    return {"message": f"Hello {user.get('preferred_username')}, this is secure!"}
 
 
 @router.get("/{geohash}", response_model=FireRiskReadingSchema)
