@@ -8,14 +8,18 @@ import {
 import "leaflet/dist/leaflet.css"
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet"
 import L from "leaflet"
-import { useZones } from "@/hooks/use-zones"
 import { useEffect, useMemo } from "react"
-import Geohash from "latlon-geohash"
+import { MapPatterns } from "./MapPatterns"
+import { getRiskStyle } from "./map-styles"
 import type { MapFeature } from "@/types/map"
 
 interface MapViewProps {
   center?: LatLngExpression
   zoom?: number
+  features: MapFeature[]
+  isLoading?: boolean
+  isError?: boolean
+  autoZoomToBounds?: boolean
 }
 
 function AutoZoom({ bounds }: { bounds: LatLngBoundsExpression | null }) {
@@ -31,64 +35,24 @@ function AutoZoom({ bounds }: { bounds: LatLngBoundsExpression | null }) {
 export function MapView({
   center = [58.359375, 10.546875] as LatLngExpression,
   zoom = 6,
+  features = [],
+  isLoading = false,
+  isError = false,
+  autoZoomToBounds = false,
 }: MapViewProps) {
-  const { zones, isLoading, isError } = useZones(false)
-
-  const getColor = (riskScore: number) => {
-    if (riskScore >= 80) return "#ef4444" // red-500
-    if (riskScore >= 50) return "#f97316" // orange-500
-    if (riskScore >= 20) return "#eab308" // yellow-500
-    return "#22c55e" // green-500
-  }
-
-  const mapData = useMemo(() => {
-    if (!zones) return []
-
-    const features = zones.features
-      .map((feature): MapFeature | null => {
-        const { geohash, risk_score, name, risk_category, is_regional } =
-          feature.properties
-
-        if (!geohash || risk_score === null) {
-          return null
-        }
-
-        try {
-          const bounds = Geohash.bounds(geohash)
-
-          const leafletBounds: LatLngBoundsExpression = [
-            [bounds.sw.lat, bounds.sw.lon],
-            [bounds.ne.lat, bounds.ne.lon],
-          ]
-
-          return {
-            id: geohash,
-            name:
-              name ||
-              (is_regional
-                ? `Regional Zone ${geohash}`
-                : `Personal Zone ${geohash}`),
-            bounds: leafletBounds,
-            riskScore: risk_score,
-            riskCategory: risk_category ?? "N/A",
-            isRegional: is_regional,
-          }
-        } catch (e) {
-          console.error(`Invalid geohash: ${geohash}`, e)
-          return null
-        }
-      })
-      .filter((item): item is MapFeature => item !== null)
-
-    // Sort: regional first, then user zones (so user zones are rendered on top)
+  // Sort: regional first, then user zones (so user zones are rendered on top)
+  const sortedFeatures = useMemo(() => {
     return [...features].sort((a, b) => {
       if (a.isRegional === b.isRegional) return 0
       return a.isRegional ? -1 : 1
     })
-  }, [zones])
+  }, [features])
 
+  // Optionally automatically zoom to bounds containing ALL user subscriptions
   const userZonesBounds = useMemo(() => {
-    const userZones = mapData.filter((f) => !f.isRegional)
+    if (!autoZoomToBounds) return null
+
+    const userZones = features.filter((f) => !f.isRegional)
     if (userZones.length === 0) return null
 
     const bounds = L.latLngBounds([])
@@ -98,7 +62,7 @@ export function MapView({
     return bounds.isValid()
       ? (bounds as unknown as LatLngBoundsExpression)
       : null
-  }, [mapData])
+  }, [features, autoZoomToBounds])
 
   if (isLoading) {
     return (
@@ -121,6 +85,7 @@ export function MapView({
 
   return (
     <div className="relative z-0 h-full w-full">
+      <MapPatterns />
       <MapContainer
         center={center}
         zoom={zoom}
@@ -134,55 +99,64 @@ export function MapView({
 
         <AutoZoom bounds={userZonesBounds} />
 
-        {mapData.map((data) => (
-          <Rectangle
-            key={data.id}
-            bounds={data.bounds}
-            pathOptions={{
-              color: getColor(data.riskScore),
-              fillColor: getColor(data.riskScore),
-              fillOpacity: data.isRegional ? 0.4 : 0.7,
-              weight: data.isRegional ? 1 : 3,
-              stroke: !data.isRegional,
-              dashArray: data.isRegional ? undefined : "5, 5",
-            }}
-          >
-            <Popup>
-              <div className="min-w-37.5 p-1 text-sm">
-                <h3 className="mb-2 text-base font-semibold">
-                  {data.name}
-                  {!data.isRegional && (
-                    <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] tracking-wider text-primary uppercase">
-                      Subscribed
+        {sortedFeatures.map((data) => {
+          const style = getRiskStyle(data.riskScore, data.isRegional)
+
+          return (
+            <Rectangle
+              key={data.id}
+              bounds={data.bounds}
+              pathOptions={{
+                color: style.color, // Border color
+                fillColor:
+                  style.pattern !== "none"
+                    ? `url(#pattern-${style.pattern})`
+                    : style.color, // Pattern or solid color
+                fillOpacity: style.pattern !== "none" ? 1 : style.fillOpacity, // If pattern, use 1 so svg opacity works
+                weight: style.weight, // Border thickness
+                stroke: style.stroke, // Show border
+                dashArray: style.dashArray,
+              }}
+            >
+              <Popup>
+                <div className="min-w-37.5 p-1 text-sm">
+                  <h3 className="mb-2 text-base font-semibold">
+                    {data.name}
+                    {!data.isRegional && (
+                      <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] tracking-wider text-primary uppercase">
+                        Subscribed
+                      </span>
+                    )}
+                  </h3>
+                  <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
+                    <span className="font-medium text-muted-foreground">
+                      Geohash:
                     </span>
-                  )}
-                </h3>
-                <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-                  <span className="font-medium text-muted-foreground">
-                    Geohash:
-                  </span>
-                  <span className="text-right font-mono">{data.id}</span>
+                    <span className="text-right font-mono">
+                      {data.id.replace("regional-", "").replace("sub-", "")}
+                    </span>
 
-                  <span className="font-medium text-muted-foreground">
-                    Risk Score:
-                  </span>
-                  <span
-                    className={`text-right font-bold ${data.riskScore > 50 ? "text-red-600" : "text-green-600"}`}
-                  >
-                    {data.riskScore.toFixed(1)}
-                  </span>
+                    <span className="font-medium text-muted-foreground">
+                      Risk Score:
+                    </span>
+                    <span
+                      className={`text-right font-bold ${data.riskScore > 50 ? "text-red-600" : "text-green-600"}`}
+                    >
+                      {data.riskScore.toFixed(1)}
+                    </span>
 
-                  <span className="font-medium text-muted-foreground">
-                    Category:
-                  </span>
-                  <span className="text-right capitalize">
-                    {data.riskCategory}
-                  </span>
+                    <span className="font-medium text-muted-foreground">
+                      Category:
+                    </span>
+                    <span className="text-right capitalize">
+                      {data.riskCategory}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Popup>
-          </Rectangle>
-        ))}
+              </Popup>
+            </Rectangle>
+          )
+        })}
       </MapContainer>
     </div>
   )

@@ -1,3 +1,5 @@
+import json
+
 from fastapi import HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +16,7 @@ from app.schemas import (
 )
 from app.utils.grid import get_geohash, get_geohash_center
 from app.utils.hateoas import create_links
+from app.utils.redis import redis_client
 
 
 async def subscribe_to_location_logic(
@@ -72,6 +75,7 @@ async def subscribe_to_location_logic(
         others=[
             {"href": f"/risk/{geohash}", "rel": "risk-data"},
             {"href": f"/users/me/subscriptions/{geohash}", "rel": "unsubscribe"},
+            {"href": f"/users/me/subscriptions/{geohash}/stream", "rel": "stream"},
             {"href": "/users/me/subscriptions/", "rel": "collection"},
         ],
     )
@@ -81,6 +85,11 @@ async def subscribe_to_location_logic(
         user_sub = UserSubscription(user_id=user_id, geohash=geohash)
         db.add(user_sub)
         await db.commit()
+
+        # 4. Push task to Redis for instant fetch
+        task = {"action": "instant_fetch", "geohash": geohash}
+        await redis_client.lpush("intelligence_tasks", json.dumps(task))
+
     except IntegrityError:
         await db.rollback()
         # The user is already subscribed to this geohash
@@ -160,7 +169,11 @@ async def get_user_subscriptions_logic(
                     {
                         "href": f"/users/me/subscriptions/{zone.geohash}",
                         "rel": "unsubscribe",
-                    }
+                    },
+                    {
+                        "href": f"/users/me/subscriptions/{zone.geohash}/stream",
+                        "rel": "stream",
+                    },
                 ],
             ),
         )

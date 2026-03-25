@@ -94,7 +94,7 @@ export default function RiskAlertsWidget() {
                     : "bg-green-100 text-green-700"
                 }`}
               >
-                {risk_score !== null ? `Risk: ${risk_score}` : "N/A"}
+                {risk_score !== null ? `Risk: ${risk_score.toFixed(1)}` : "N/A"}
                 {risk_category && (
                   <span className="ml-1 opacity-70">({risk_category})</span>
                 )}

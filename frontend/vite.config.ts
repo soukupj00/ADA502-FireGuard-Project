@@ -13,6 +13,20 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    proxy: {
+      // Forward /api requests to the FastAPI backend container
+      "/api": {
+        target: "http://backend:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      // Forward /auth requests to the Keycloak container
+      "/auth": {
+        target: "http://keycloak:8080/auth",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   resolve: {
     alias: {

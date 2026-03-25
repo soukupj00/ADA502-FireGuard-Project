@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import get_current_user, get_current_user_ws_or_sse
 from app.db.database import get_db
 from app.schemas import (
     GeoJSONFeatureCollection,
@@ -13,12 +14,15 @@ from app.services.subscription_service import (
     subscribe_to_location_logic,
     unsubscribe_from_location_logic,
 )
+from app.utils.redis import redis_client
 
 # Changed prefix for better RESTful structure
 router = APIRouter(prefix="/users/me/subscriptions", tags=["User Subscriptions"])
 
 
-@router.post("/", response_model=SubscriptionResponse)
+@router.post(
+    "/", response_model=SubscriptionResponse, status_code=status.HTTP_202_ACCEPTED
+)
 async def create_subscription(
     request: Request,
     payload: SubscriptionRequest,
@@ -57,3 +61,36 @@ async def delete_subscription(
     user_id = user.get("sub")
     await unsubscribe_from_location_logic(db, geohash, user_id)
     return None
+
+
+@router.get("/{geohash}/stream")
+async def stream_subscription_updates(
+    geohash: str, user: dict = Depends(get_current_user_ws_or_sse)
+) -> StreamingResponse:
+    """
+    Streams fire risk updates for a specific geohash via Server-Sent Events.
+    """
+
+    async def event_generator():
+        pubsub = redis_client.pubsub()
+        channel_name = f"location_updates:{geohash}"
+        await pubsub.subscribe(channel_name)
+
+        try:
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    data = message["data"].decode("utf-8")
+                    yield f"data: {data}\n\n"
+                    break  # Close stream after first update
+        finally:
+            await pubsub.unsubscribe(channel_name)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Forces Nginx to pass data instantly
+        },
+    )

@@ -1,63 +1,26 @@
 # intelligence-system/src/main.py
 import asyncio
+import json
 import logging
-from typing import Any
+
+import redis.asyncio as redis
 
 from config import settings
 from db.database import (
     create_db_and_tables,
     get_latest_readings,
     get_monitored_zones,
-    save_risk_data,
-    save_weather_data,
+    get_zone_by_geohash,
     seed_initial_zones,
 )
-from utils.fire_risk_service import calculate_risk
-from utils.met_api import fetch_weather
+from services.zone_processor import process_zone
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("IntelligenceSystem")
 
-
-async def process_zone(zone: Any, semaphore: asyncio.Semaphore) -> None:
-    """
-    Fetches weather, calculates risk, and saves data for a single zone.
-    Uses semaphore to limit concurrency.
-    """
-    async with semaphore:
-        logger.info(f"Processing zone: {zone.name} ({zone.geohash})")
-
-        # 1. Fetch weather for the center of the zone
-        met_data = await fetch_weather(zone.center_lat, zone.center_lon)
-
-        if not met_data:
-            logger.warning(f"Skipping zone {zone.geohash} due to fetch error.")
-            return
-
-        # Save raw weather data to the database
-        await save_weather_data(
-            location_name=zone.geohash,
-            lat=zone.center_lat,
-            lon=zone.center_lon,
-            weather_json=met_data,
-        )
-
-        # 2. Compute Risk
-        risk_result = calculate_risk(met_data)
-
-        if risk_result:
-            logger.info(f"Zone: {zone.geohash}, TTF: {risk_result['ttf']}")
-
-            # 3. Save risk result to DB
-            await save_risk_data(
-                location_name=zone.geohash,
-                lat=zone.center_lat,
-                lon=zone.center_lon,
-                risk_result=risk_result,
-            )
-        else:
-            logger.warning(f"Risk calculation failed for zone {zone.geohash}")
+# Redis Client
+redis_client = redis.from_url(settings.REDIS_URL)
 
 
 async def job() -> None:
@@ -89,16 +52,48 @@ async def job() -> None:
         logger.info(f"DEBUG - Latest data for {sample_geohash}: {latest_data}")
 
 
-async def main() -> None:
-    """
-    The main function that runs the intelligence system worker.
-    """
-    logger.info("Intelligence System Worker Started.")
+async def process_instant_queue() -> None:
+    """Listens for instant requests pushed by the backend via Redis."""
+    logger.info("Instant Queue Processor Started.")
+    while True:
+        try:
+            # Block until a message is added to 'intelligence_tasks'
+            result = await redis_client.brpop("intelligence_tasks", timeout=0)
+            if result:
+                _, message = result
+                task = json.loads(message)
+                # Support both geohash (from backend) and location_id
+                loc_id = task.get("geohash") or task.get("location_id")
 
-    # Create DB tables and seed with initial zones
-    await create_db_and_tables()
-    await seed_initial_zones()
+                if not loc_id:
+                    logger.warning("Received task without geohash or location_id")
+                    continue
 
+                logger.info(f"Instant task received for location: {loc_id}")
+
+                # 1. Fetch zone details from DB
+                zone = await get_zone_by_geohash(loc_id)
+                if not zone:
+                    logger.error(f"Zone {loc_id} not found in database.")
+                    continue
+
+                # 2. Process the zone
+                risk_data = await process_zone(zone)
+
+                if risk_data:
+                    # 3. Publish the result back to Redis so the Backend can stream it
+                    channel_name = f"location_updates:{loc_id}"
+                    await redis_client.publish(channel_name, json.dumps(risk_data))
+                    logger.info(f"Published update to {channel_name}")
+
+        except Exception as e:
+            logger.error(f"Queue Error: {e}", exc_info=True)
+            await asyncio.sleep(5)
+
+
+async def process_scheduled_locations() -> None:
+    """Standard background polling loop for all monitored zones."""
+    logger.info("Scheduled Locations Processor Started.")
     while True:
         try:
             await job()
@@ -108,8 +103,22 @@ async def main() -> None:
             )
             await asyncio.sleep(settings.FETCH_INTERVAL_SECONDS)
         except Exception as e:
-            logger.error(f"Critical Worker Error: {e}", exc_info=True)
+            logger.error(f"Scheduled Task Error: {e}", exc_info=True)
             await asyncio.sleep(60)
+
+
+async def main() -> None:
+    """
+    The main function that runs the intelligence system worker.
+    """
+    logger.info("Intelligence System Worker Starting...")
+
+    # Create DB tables and seed with initial zones
+    await create_db_and_tables()
+    await seed_initial_zones()
+
+    # Run instant queue and scheduled tasks concurrently
+    await asyncio.gather(process_instant_queue(), process_scheduled_locations())
 
 
 if __name__ == "__main__":

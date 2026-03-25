@@ -9,47 +9,86 @@ services:
       POSTGRES_DB: fireguard_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U fireuser -d fireguard_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # 2. FastAPI Backend
+    # 1.5 PostgreSQL Database for Keycloak
+    keycloak_db:
+      image: postgres:15-alpine
+      restart: always
+      environment:
+        POSTGRES_USER: keycloak_user
+        POSTGRES_PASSWORD: keycloak_password
+        POSTGRES_DB: keycloak_db
+      volumes:
+        - keycloak_data:/var/lib/postgresql/data
+      healthcheck:
+        test: [ "CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db" ]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+
+  # 2 Redis (For SSE and Caching)
+  redis:
+    image: redis:7-alpine
+    restart: always
+
+  # 3. FastAPI Backend
   backend:
     build: ./backend
     restart: always
     depends_on:
       - db
       - keycloak
+      - redis
     environment:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
+      REDIS_URL: redis://redis:6379/0
 
+  # 4. Intelligence System
   intelligence:
     build: ./intelligence-system
     restart: always
     depends_on:
       - db
+      - redis
     environment:
-      # Connects to the SAME database as backend
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
+      REDIS_URL: redis://redis:6379/0
 
-  # 3. Frontend + Nginx Proxy
+  # 5. Frontend + Nginx Proxy (The ONLY public entry point)
   frontend:
-    build: 
+    build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
     restart: always
     ports:
-      - "80:80"
+      - "80:80"  # This is the ONLY port exposed to the internet
     depends_on:
       - backend
+      - keycloak
 
-  # 4. Keycloak
+  # 6. Keycloak Auth Server
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     command: start-dev
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-    ports:
-      - "8080:8080"
+      # Tell Keycloak it is running behind Nginx
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: "false" # Allows access via raw IP address instead of domain
+      KC_HTTP_RELATIVE_PATH: /auth/ # Forces Keycloak to serve from /auth/ to match Nginx
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
+      KC_DB_USERNAME: keycloak_user
+      KC_DB_PASSWORD: keycloak_password
+    # NO ports section here. It is fully shielded by Nginx.
 
 volumes:
   postgres_data:
+  keycloak_data:

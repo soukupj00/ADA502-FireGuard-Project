@@ -35,7 +35,14 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. FastAPI Backend
+  # 2. Redis
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379" # Expose in dev so you can inspect it with RedisInsight/CLI
+
+  # 3. FastAPI Backend
   backend:
     build:
       context: ./backend
@@ -45,8 +52,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+asyncpg://user:password@db:5432/fireguard_db
+      REDIS_URL: redis://redis:6379/0
     develop:
       watch:
         - action: sync
@@ -55,7 +65,7 @@ services:
         - action: rebuild
           path: ./backend/pyproject.toml
 
-  # 3. Intelligence System (The Worker)
+  # 4. Intelligence System (The Worker)
   intelligence:
     build:
       context: ./intelligence-system
@@ -63,8 +73,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+asyncpg://user:password@db:5432/fireguard_db
+      REDIS_URL: redis://redis:6379/0
     develop:
       watch:
         - action: sync
@@ -73,7 +86,7 @@ services:
         - action: rebuild
           path: ./intelligence-system/pyproject.toml
 
-  # 4. React Frontend
+  # 5. React Frontend
   frontend:
     build:
       context: ./frontend
@@ -110,6 +123,10 @@ services:
       # Fix for modern Keycloak behind proxies/Docker
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+      # Forces Keycloak to serve from /auth/ to match production
+      KC_HTTP_RELATIVE_PATH: /auth/
+      # Tells Keycloak it might be accessed via a proxy (Vite)
+      KC_PROXY_HEADERS: xforwarded
     ports:
       - "8080:8080"
     depends_on:
