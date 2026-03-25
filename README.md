@@ -10,12 +10,16 @@ The system follows a microservices architecture:
 2.  **Backend (FastAPI):** A REST API that serves data to the frontend and manages user requests.
 3.  **Intelligence System (Python Worker):** A background service that periodically fetches weather data from MET.no, computes Fire Risk Indices (FRCM), and updates the database.
 4.  **Database (PostgreSQL):** A shared database used by the Backend (Reader) and Intelligence System (Writer).
+5.  **Keycloak:** An identity and access management solution for user authentication.
+6.  **Redis:** An in-memory data store used for caching and message broking.
 
 ## Project Structure
 
 * **backend/**: Contains the FastAPI application code, database models, and API routers.
 * **frontend/**: Contains the React application source code and Nginx configuration.
 * **intelligence-system/**: Contains the background worker logic and the Fire Risk Calculation Model (FRCM).
+* **.github/workflows/ci.yml**: GitHub Actions configuration for CI/CD.
+* **.pre-commit-config.yaml**: Pre-commit hooks configuration.
 * **docker-compose.yml**: Configuration for the local development environment.
 * **docker-compose.prod.yml**: Configuration for the production environment (NREC).
 
@@ -26,6 +30,7 @@ To run this project, you need the following tools installed:
 * **Docker & Docker Compose** (Recommended for all environments)
 * **Python 3.12+** and **uv** (for local backend/intelligence development)
 * **Node.js 20+** (for local frontend development)
+* **pre-commit** (for code quality)
 
 ## Getting Started (Development)
 
@@ -41,17 +46,20 @@ The recommended way to run the project locally is using Docker Compose. This spi
 
 2.  Start the services:
     ```bash
-    docker compose up --build
+    docker compose up --build (optional -d for detached mode)
     ```
 
 3.  Access the application:
     * **Frontend:** http://localhost:5173
     * **Backend API Docs:** http://localhost:8000/api/docs
-    * **Database:** localhost:5432 (User: `user`, Password: `password`)
+    * **Keycloak Admin Console:** http://localhost:8080/auth/admin (User: `admin`, Password: `admin`)
+    * **Application Database:** localhost:5433 (User: `user`, Password: `password`)
+    * **Keycloak Database:** localhost:5434 (User: `keycloak_user`, Password: `keycloak_password`)
+    * **Redis:** localhost:6379
 
 ### 2. Manual Setup (Running Services Individually)
 
-If you prefer to run services natively on your machine without Docker, follow these steps. Note that you must have a PostgreSQL database running separately.
+If you prefer to run services natively on your machine without Docker, follow these steps. Note that you must have a PostgreSQL database, Redis, and Keycloak running separately.
 
 #### Backend
 1.  Navigate to `backend/`.
@@ -86,30 +94,32 @@ If you prefer to run services natively on your machine without Docker, follow th
     uv run python src/main.py
     ```
 
-## Testing and Linting
+## Testing, Linting and CI/CD
 
-The project enforces code quality through automated tests and linting.
+The project enforces code quality through automated tests, linting, and pre-commit hooks. The CI/CD pipeline is configured using GitHub Actions and automatically runs on every push and pull request to the `main` branch.
 
-### Backend & Intelligence System
-1.  Run Linting (Ruff):
+### Pre-commit Hooks
+
+This project uses `pre-commit` to automatically lint and format code before each commit. To set it up:
+
+1.  Install `pre-commit`:
     ```bash
-    uv run ruff check .
-    uv run ruff format --check .
+    pip install pre-commit
     ```
-2.  Run Tests (Pytest):
+2.  Install the hooks:
     ```bash
-    uv run pytest
+    pre-commit install
     ```
 
-### Frontend
-1.  Run Linting (ESLint):
-    ```bash
-    npm run lint
-    ```
-2.  Run Tests (Vitest):
-    ```bash
-    npm run test
-    ```
+Now, `ruff` (for Python) and `prettier`/`eslint` (for the frontend) will run automatically on staged files before you commit.
+
+### CI/CD
+
+The CI/CD pipeline is defined in `.github/workflows/ci.yml` and consists of three jobs:
+
+1.  **Backend CI:** Lints, tests, and builds the backend Docker image.
+2.  **Intelligence System CI:** Lints, tests, and builds the intelligence system Docker image.
+3.  **Frontend CI:** Lints, type-checks, and builds the frontend application.
 
 ## Deployment (NREC)
 
@@ -160,6 +170,3 @@ If you cannot start the containers, ensure ports `5432` (Postgres), `8000` (Back
 
 **Database Connection Errors:**
 Ensure the `DATABASE_URL` environment variable matches the credentials defined in the `docker-compose.yml` file. In development, the hostname is `localhost` (if running locally) or `db` (if running inside Docker).
-
-**Git Conflicts:**
-If you encounter merge conflicts, use the IDE's merge tool to resolve them. Ensure you fetch the latest `main` branch before starting new features.
