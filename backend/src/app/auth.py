@@ -27,24 +27,28 @@ oauth2_scheme = OAuth2AuthorizationCodeBearer(
 
 JWKS_URL = f"{KEYCLOAK_INTERNAL_URL}/realms/{REALM}/protocol/openid-connect/certs"
 
+
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
-        # FETCH PUBLIC KEYS (Consider caching this globally to avoid per-request network calls)
+        # FETCH PUBLIC KEYS (Consider caching this globally to
+        # avoid per-request network calls)
         async with httpx.AsyncClient() as client:
             response = await client.get(JWKS_URL)
             response.raise_for_status()
             jwks = response.json()
 
         # DECODE AND VERIFY
-        # Change: We now verify the audience to ensure the token was intended for the backend-client
+        # We now verify the audience to ensure the token
+        # was intended for the backend-client
         payload = jwt.decode(
             token,
             jwks,
             algorithms=["RS256"],
-            audience=BACKEND_CLIENT_ID, # Verify that 'aud' claim matches 'backend-client'
+            audience=BACKEND_CLIENT_ID,  # Verify that 'aud' claim
+            # matches 'backend-client'
             options={
-                "verify_aud": True,     # Turned this ON for better security
-                "verify_at_hash": False
+                "verify_aud": True,  # Turned this ON for better security
+                "verify_at_hash": False,
             },
         )
         return payload
