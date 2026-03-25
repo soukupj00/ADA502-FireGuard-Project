@@ -1,22 +1,52 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { ApiError } from "@/lib/types"
 import { subscribeToLocation } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import keycloak from "@/keycloak"
 import { useSWRConfig } from "swr"
+import { useLocationStream } from "@/hooks/use-location-stream"
 
 interface LocationSubscriberProps {
   selectedLat: number | null
   selectedLon: number | null
+  onSuccess?: () => void
 }
 
 export function LocationSubscriber({
   selectedLat,
   selectedLon,
+  onSuccess,
 }: LocationSubscriberProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [pendingGeohash, setPendingGeohash] = useState<string | null>(null)
   const { mutate } = useSWRConfig()
+
+  const { riskData, error: streamError } = useLocationStream(pendingGeohash)
+
+  useEffect(() => {
+    if (riskData) {
+      toast.info("Real-time risk data received!", {
+        description: `Risk Level: ${riskData.risk_category} (Score: ${riskData.risk_score?.toFixed(2)})`,
+      })
+      // Clear pending geohash once data is received
+      setPendingGeohash(null)
+      // Re-fetch zones to show on map
+      mutate(["/zones", false])
+      mutate("/users/me/subscriptions/")
+      if (onSuccess) onSuccess()
+    }
+  }, [riskData, mutate, onSuccess])
+
+  useEffect(() => {
+    if (streamError) {
+      toast.error("Stream Error", {
+        description:
+          "Failed to receive real-time updates for the new location.",
+      })
+      setPendingGeohash(null)
+    }
+  }, [streamError])
 
   const handleSubscribe = async () => {
     // Safety check: is the user actually logged in?
@@ -42,11 +72,15 @@ export function LocationSubscriber({
         description: response.message || "You are now tracking this location.",
       })
 
-      console.log("Subscribed Geohash:", response.geohash)
-
-      // Re-fetch zones and user subscriptions to update map/list
-      mutate(["/zones", false])
-      mutate("/users/me/subscriptions/")
+      // If the zone is newly created (pending), we wait for the stream
+      if (response.status === "pending") {
+        setPendingGeohash(response.geohash)
+      } else {
+        // If it was already active, we just refresh everything
+        mutate(["/zones", false])
+        mutate("/users/me/subscriptions/")
+        if (onSuccess) onSuccess()
+      }
     } catch (error: unknown) {
       const apiError = error as ApiError
       const message = apiError.message || "An unknown error occurred"
@@ -71,11 +105,27 @@ export function LocationSubscriber({
           Select a location on the map to subscribe.
         </p>
       )}
+
+      {pendingGeohash && (
+        <div className="mb-2 animate-pulse rounded bg-muted p-2 text-xs">
+          Waiting for risk analysis...
+        </div>
+      )}
+
       <Button
         onClick={handleSubscribe}
-        disabled={isSubmitting || selectedLat === null || selectedLon === null}
+        disabled={
+          isSubmitting ||
+          !!pendingGeohash ||
+          selectedLat === null ||
+          selectedLon === null
+        }
       >
-        {isSubmitting ? "Subscribing..." : "Subscribe to Alerts"}
+        {isSubmitting
+          ? "Subscribing..."
+          : pendingGeohash
+            ? "Analyzing..."
+            : "Subscribe to Alerts"}
       </Button>
     </div>
   )

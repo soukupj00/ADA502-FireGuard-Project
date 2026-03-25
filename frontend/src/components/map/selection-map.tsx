@@ -1,17 +1,22 @@
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import {
   MapContainer,
   TileLayer,
   Marker,
   useMap,
   useMapEvents,
+  Rectangle,
 } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import "leaflet-geosearch/dist/geosearch.css"
-import type { LatLngExpression } from "leaflet"
+import type { LatLngBoundsExpression, LatLngExpression } from "leaflet"
 import L from "leaflet"
 import { GeoSearchControl, OpenStreetMapProvider } from "leaflet-geosearch"
 import type { GeoSearchResult } from "@/lib/types"
+import type { MapFeature } from "@/types/map"
+import { useZones } from "@/hooks/use-zones"
+import Geohash from "latlon-geohash"
+import { getRiskStyle } from "./map-styles"
 
 // Fix for the default marker icon in react-leaflet
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl: unknown })
@@ -99,6 +104,42 @@ export function SelectionMap({
   selectedLocation,
   onLocationSelect,
 }: SelectionMapProps) {
+  // Load zones to draw the invisible grid for clicking reference
+  const { zones } = useZones(false)
+
+  const mapData = useMemo(() => {
+    if (!zones) return []
+
+    return zones.features
+      .map((feature): MapFeature | null => {
+        const { geohash, risk_score, name, risk_category, is_regional } =
+          feature.properties
+
+        if (!geohash || risk_score === null) return null
+
+        try {
+          const bounds = Geohash.bounds(geohash)
+          const leafletBounds: LatLngBoundsExpression = [
+            [bounds.sw.lat, bounds.sw.lon],
+            [bounds.ne.lat, bounds.ne.lon],
+          ]
+
+          return {
+            id: geohash,
+            name: name || "",
+            bounds: leafletBounds,
+            riskScore: risk_score,
+            riskCategory: risk_category ?? "N/A",
+            isRegional: is_regional,
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_e) {
+          return null
+        }
+      })
+      .filter((item): item is MapFeature => item !== null)
+  }, [zones])
+
   return (
     <div className="relative z-0 h-full w-full">
       <MapContainer
@@ -116,6 +157,26 @@ export function SelectionMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        {/* Draw the transparent grid for visual reference so users know where the zones are */}
+        {mapData.map((data) => {
+          const style = getRiskStyle(data.riskScore, data.isRegional)
+          return (
+            <Rectangle
+              key={`grid-${data.id}`}
+              bounds={data.bounds}
+              interactive={false} // Make it unclickable so the map click registers!
+              pathOptions={{
+                color: style.color,
+                fillColor: "transparent", // Only show the border
+                fillOpacity: 0,
+                weight: 1,
+                stroke: true,
+                dashArray: data.isRegional ? undefined : "5, 5",
+              }}
+            />
+          )
+        })}
 
         <SearchField onLocationSelect={onLocationSelect} />
 

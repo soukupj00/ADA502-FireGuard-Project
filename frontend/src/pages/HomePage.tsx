@@ -9,6 +9,10 @@ import {
 import { Button } from "@/components/ui/button"
 import keycloak from "@/keycloak"
 import { LogIn, User, UserPlus } from "lucide-react"
+import { useZones } from "@/hooks/use-zones"
+import { useMemo } from "react"
+import Geohash from "latlon-geohash"
+import type { MapFeature } from "@/types/map"
 
 export default function HomePage({
   isAuthenticated,
@@ -17,6 +21,40 @@ export default function HomePage({
 }) {
   const handleLogin = () => keycloak.login()
   const handleRegister = () => keycloak.register()
+
+  // For the public home page, ONLY fetch the regional zones!
+  const { zones, isLoading, isError } = useZones(true)
+
+  const mapFeatures = useMemo(() => {
+    if (!zones) return []
+
+    return zones.features
+      .map((feature): MapFeature | null => {
+        const { geohash, risk_score, name, risk_category } = feature.properties
+
+        if (!geohash || risk_score === null) return null
+
+        try {
+          const bounds = Geohash.bounds(geohash)
+
+          return {
+            id: `regional-${geohash}`,
+            name: name || `Regional Zone ${geohash}`,
+            bounds: [
+              [bounds.sw.lat, bounds.sw.lon],
+              [bounds.ne.lat, bounds.ne.lon],
+            ],
+            riskScore: risk_score,
+            riskCategory: risk_category ?? "N/A",
+            isRegional: true,
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (e) {
+          return null
+        }
+      })
+      .filter((item): item is MapFeature => item !== null)
+  }, [zones])
 
   return (
     <div className="container mx-auto flex-1 p-4 py-8">
@@ -30,8 +68,12 @@ export default function HomePage({
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="relative z-0 h-[600px] w-full overflow-hidden rounded-md border shadow-inner">
-            <MapView />
+          <div className="relative z-0 h-150 w-full overflow-hidden rounded-md border shadow-inner">
+            <MapView
+              features={mapFeatures}
+              isLoading={isLoading}
+              isError={isError}
+            />
           </div>
           <div className="mt-6 grid grid-cols-2 justify-center gap-4 rounded-lg border bg-muted/20 p-4 text-sm md:grid-cols-4">
             <div className="flex items-center justify-center gap-2">
