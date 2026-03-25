@@ -86,7 +86,7 @@ services:
         - action: rebuild
           path: ./intelligence-system/pyproject.toml
 
-  # 4. React Frontend
+  # 5. React Frontend
   frontend:
     build:
       context: ./frontend
@@ -123,6 +123,10 @@ services:
       # Fix for modern Keycloak behind proxies/Docker
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+      # Forces Keycloak to serve from /auth/ to match production
+      KC_HTTP_RELATIVE_PATH: /auth/
+      # Tells Keycloak it might be accessed via a proxy (Vite)
+      KC_PROXY_HEADERS: xforwarded
     ports:
       - "8080:8080"
     depends_on:

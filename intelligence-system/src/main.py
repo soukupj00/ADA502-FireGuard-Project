@@ -62,10 +62,11 @@ async def process_instant_queue() -> None:
             if result:
                 _, message = result
                 task = json.loads(message)
-                loc_id = task.get("location_id")
+                # Support both geohash (from backend) and location_id
+                loc_id = task.get("geohash") or task.get("location_id")
 
                 if not loc_id:
-                    logger.warning("Received task without location_id")
+                    logger.warning("Received task without geohash or location_id")
                     continue
 
                 logger.info(f"Instant task received for location: {loc_id}")
