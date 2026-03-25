@@ -15,28 +15,28 @@ services:
       timeout: 5s
       retries: 5
 
-    # 1.5 PostgreSQL Database for Keycloak
-    keycloak_db:
-      image: postgres:15-alpine
-      restart: always
-      environment:
-        POSTGRES_USER: keycloak_user
-        POSTGRES_PASSWORD: keycloak_password
-        POSTGRES_DB: keycloak_db
-      volumes:
-        - keycloak_data:/var/lib/postgresql/data
-      healthcheck:
-        test: [ "CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db" ]
-        interval: 5s
-        timeout: 5s
-        retries: 5
+  # 2. PostgreSQL Database for Keycloak
+  keycloak_db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: keycloak_user
+      POSTGRES_PASSWORD: keycloak_password
+      POSTGRES_DB: keycloak_db
+    volumes:
+      - keycloak_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # 2 Redis (For SSE and Caching)
+  # 3. Redis (For SSE and Caching)
   redis:
     image: redis:7-alpine
     restart: always
 
-  # 3. FastAPI Backend
+  # 4. FastAPI Backend
   backend:
     build: ./backend
     restart: always
@@ -48,7 +48,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
       REDIS_URL: redis://redis:6379/0
 
-  # 4. Intelligence System
+  # 5. Intelligence System
   intelligence:
     build: ./intelligence-system
     restart: always
@@ -59,7 +59,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
       REDIS_URL: redis://redis:6379/0
 
-  # 5. Frontend + Nginx Proxy (The ONLY public entry point)
+  # 6. Frontend + Nginx Proxy (The ONLY public entry point)
   frontend:
     build:
       context: ./frontend
@@ -68,11 +68,15 @@ services:
     restart: always
     ports:
       - "80:80"  # This is the ONLY port exposed to the internet
+      - "443:443" # Open HTTPS port
     depends_on:
       - backend
       - keycloak
+    volumes: # Mount the certificates into Nginx
+      - ./nginx-selfsigned.crt:/etc/nginx/ssl/cert.crt:ro
+      - ./nginx-selfsigned.key:/etc/nginx/ssl/cert.key:ro
 
-  # 6. Keycloak Auth Server
+  # 7. Keycloak Auth Server
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     command: start-dev
@@ -83,6 +87,9 @@ services:
       KC_PROXY_HEADERS: xforwarded
       KC_HOSTNAME_STRICT: "false" # Allows access via raw IP address instead of domain
       KC_HTTP_RELATIVE_PATH: /auth/ # Forces Keycloak to serve from /auth/ to match Nginx
+      KC_HOSTNAME_STRICT_HTTPS: "false" # Forces Keycloak to allow HTTP requests
+      KC_HTTP_ENABLED: "true" # Forces Keycloak to allow HTTP requests
+      KC_HOSTNAME_URL: "https://158.37.63.48/auth/" # Set the public URL for Keycloak
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user

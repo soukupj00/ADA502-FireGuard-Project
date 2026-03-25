@@ -17,7 +17,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # 1.5 PostgreSQL Database for Keycloak
+  # 2 PostgreSQL Database for Keycloak
   keycloak_db:
     image: postgres:15-alpine
     restart: always
@@ -35,14 +35,14 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Redis
+  # 3. Redis
   redis:
     image: redis:7-alpine
     restart: always
     ports:
       - "6379:6379" # Expose in dev so you can inspect it with RedisInsight/CLI
 
-  # 3. FastAPI Backend
+  # 4. FastAPI Backend
   backend:
     build:
       context: ./backend
@@ -65,7 +65,7 @@ services:
         - action: rebuild
           path: ./backend/pyproject.toml
 
-  # 4. Intelligence System (The Worker)
+  # 5. Intelligence System (The Worker)
   intelligence:
     build:
       context: ./intelligence-system
@@ -86,7 +86,7 @@ services:
         - action: rebuild
           path: ./intelligence-system/pyproject.toml
 
-  # 5. React Frontend
+  # 6. React Frontend
   frontend:
     build:
       context: ./frontend
@@ -96,6 +96,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_KEYCLOAK_URL=http://localhost:8080/auth
     depends_on:
       - backend
     # ADD THIS SECTION BELOW:
@@ -107,7 +108,7 @@ services:
       # Prevent node_modules from being overwritten by the host
       - /app/node_modules
 
-  # 5. Keycloak
+  # 7. Keycloak
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     command: start-dev
