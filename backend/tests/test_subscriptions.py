@@ -23,6 +23,10 @@ async def test_create_subscription_authorized(
             Link(
                 href=f"/api/v1/users/me/subscriptions/{MOCK_GEOHASH}", rel="unsubscribe"
             ),
+            Link(
+                href=f"/api/v1/users/me/subscriptions/{MOCK_GEOHASH}/stream",
+                rel="stream",
+            ),
         ],
     )
     payload = {"geohash": MOCK_GEOHASH}
@@ -31,7 +35,7 @@ async def test_create_subscription_authorized(
         json=payload,
         headers={"Authorization": "Bearer mock-token"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = response.json()
     assert data["geohash"] == MOCK_GEOHASH
     assert "@context" in data
@@ -41,6 +45,7 @@ async def test_create_subscription_authorized(
     assert "self" in rels
     assert "risk-data" in rels
     assert "unsubscribe" in rels
+    assert "stream" in rels
 
 
 @pytest.mark.asyncio
@@ -80,6 +85,10 @@ async def test_get_my_subscriptions_authorized(
                         href=f"/api/v1/users/me/subscriptions/{MOCK_GEOHASH}",
                         rel="unsubscribe",
                     ),
+                    Link(
+                        href=f"/api/v1/users/me/subscriptions/{MOCK_GEOHASH}/stream",
+                        rel="stream",
+                    ),
                 ],
             )
         ],
@@ -97,12 +106,13 @@ async def test_get_my_subscriptions_authorized(
     assert "_links" in data
     assert any(link["rel"] == "self" for link in data["_links"])
 
-    # Check feature-level unsubscribe link
+    # Check feature-level links
     feature = data["features"][0]
     assert "_links" in feature
     rels = [link["rel"] for link in feature["_links"]]
     assert "unsubscribe" in rels
     assert "risk-data" in rels
+    assert "stream" in rels
 
 
 @pytest.mark.asyncio
@@ -144,3 +154,41 @@ async def test_delete_subscription_not_found(
 async def test_delete_subscription_unauthorized(client, mock_db_dep):
     response = await client.delete(f"/api/v1/users/me/subscriptions/{MOCK_GEOHASH}")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+@patch("app.routers.subscription.redis_client")
+async def test_stream_subscription_updates_authorized(
+    mock_redis, client, mock_auth, mock_db_dep
+):
+    from unittest.mock import AsyncMock, MagicMock
+
+    # Mock Redis PubSub
+    mock_pubsub = MagicMock()
+    mock_pubsub.subscribe = AsyncMock()
+    mock_pubsub.unsubscribe = AsyncMock()
+    mock_redis.pubsub = MagicMock(return_value=mock_pubsub)
+
+    # Mock listen to return one message then stop
+    async def mock_listen():
+        yield {"type": "message", "data": b"latest-risk-data"}
+
+    mock_pubsub.listen.side_effect = mock_listen
+
+    response = await client.get(
+        f"/api/v1/users/me/subscriptions/{MOCK_GEOHASH}/stream",
+        headers={"Authorization": "Bearer mock-token"},
+    )
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]
+    assert response.headers["X-Accel-Buffering"] == "no"
+
+    # Read the first chunk
+    content = ""
+    async for line in response.aiter_lines():
+        if line:
+            content += line
+        if "data: latest-risk-data" in content:
+            break
+
+    assert "data: latest-risk-data" in content
