@@ -1,9 +1,10 @@
 import Keycloak from "keycloak-js"
 
 const keycloakConfig = {
-  url: "http://localhost:8080/auth", // The Keycloak URL
-  realm: "FireGuard", // The realm you created
-  clientId: "react-app", // The client ID you created
+  // Use a relative path. Nginx/Vite will route this to the Keycloak container.
+  url: "/auth",
+  realm: "FireGuard",
+  clientId: "react-app",
 }
 
 const keycloak = new Keycloak(keycloakConfig)
