@@ -8,9 +8,11 @@ import { Toaster } from "@/components/ui/sonner"
 
 keycloak
   .init({
-    onLoad: "check-sso", // CHANGE THIS: Check silently, don't force login
+    onLoad: "check-sso",
     silentCheckSsoRedirectUri:
-      window.location.origin + "/silent-check-sso.html", // Required for check-sso to work smoothly
+      window.location.origin + "/silent-check-sso.html",
+    // Stops the browser from blocking the NREC IP hidden iframe
+    checkLoginIframe: false,
   })
   .then((authenticated: boolean) => {
     const rootElement = document.getElementById("root")
@@ -19,7 +21,6 @@ keycloak
     createRoot(rootElement).render(
       <StrictMode>
         <ThemeProvider>
-          {/* You can pass the auth state if you want, but keycloak object is global */}
           <App isAuthenticated={authenticated} />
           <Toaster />
         </ThemeProvider>
