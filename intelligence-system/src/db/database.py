@@ -126,6 +126,15 @@ async def get_monitored_zones() -> Sequence[Any]:
         return result.scalars().all()
 
 
+async def get_zone_by_geohash(geohash: str) -> MonitoredZone | None:
+    """Returns a single monitored zone by its geohash."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(MonitoredZone).where(MonitoredZone.geohash == geohash)
+        )
+        return result.scalar_one_or_none()
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for getting an async database session."""
     async with AsyncSessionLocal() as session:

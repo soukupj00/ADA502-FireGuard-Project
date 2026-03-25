@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     """Manages application settings and configurations."""
 
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost/fireguard"
+    REDIS_URL: str = "redis://redis:6379/0"
     FETCH_INTERVAL_SECONDS: int = 3600
     MAX_CONCURRENT_FETCHES: int = 5
 

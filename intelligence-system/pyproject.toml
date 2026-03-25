@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "pygeohash>=1.2.0",
+    "redis>=7.4.0",
     "ruff>=0.15.4",
     "sqlalchemy>=2.0.47",
 ]
