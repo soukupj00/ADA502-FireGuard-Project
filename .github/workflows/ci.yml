@@ -59,7 +59,7 @@ jobs:
         # Installs bandit and runs it against your code (assuming code is in ./src or ./app)
         run: |
           uv pip install bandit
-          uv run bandit -r . -ll -ii # -ll ignores low severity, -ii ignores low confidence
+          uv run bandit -r . -x ./.venv,./tests -ll -ii # -ll ignores low severity, -ii ignores low confidence
 
       - name: Run Tests
         # Runs pytest using the environment created by uv
@@ -110,7 +110,7 @@ jobs:
         # Installs bandit and runs it against your code (assuming code is in ./src or ./app)
         run: |
           uv pip install bandit
-          uv run bandit -r . -ll -ii # -ll ignores low severity, -ii ignores low confidence
+          uv run bandit -r . -x ./.venv,./tests -ll -ii # -ll ignores low severity, -ii ignores low confidence
 
       - name: Run Tests
         run: uv run pytest
