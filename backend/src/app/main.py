@@ -5,7 +5,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.database import create_db_and_tables
-from app.routers import risk_router, subscription, zones
+from app.routers import history_router, risk_router, subscription, zones
 
 
 @asynccontextmanager
@@ -65,7 +65,18 @@ def create_app() -> FastAPI:
             others=[
                 {"href": "/risk/coords", "rel": "risk-by-coords"},
                 {"href": "/zones/", "rel": "zones"},
-                {"href": "/users/me/subscriptions/", "rel": "subscriptions"},
+                {
+                    "href": "/zones/history",
+                    "rel": "zones-history",
+                },  # Public, for regional zones history
+                {
+                    "href": "/history/",
+                    "rel": "history-all-readings",
+                },  # Public, for all historical readings
+                {
+                    "href": "/users/me/subscriptions/",
+                    "rel": "subscriptions",
+                },  # Protected, but discoverable
             ],
         )
         return {
@@ -81,6 +92,7 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(risk_router.router)
     api_v1_router.include_router(zones.router)
     api_v1_router.include_router(subscription.router)
+    api_v1_router.include_router(history_router.router)
 
     # Include the main API router into the app
     fastapi_app.include_router(api_v1_router)

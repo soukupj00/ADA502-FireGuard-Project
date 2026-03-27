@@ -9,6 +9,7 @@ from app.schemas import (
     GeoJSONGeometry,
     GeoJSONProperties,
 )
+from app.utils.constants import RISK_LEGEND_DATA
 from app.utils.hateoas import create_links
 
 
@@ -35,6 +36,7 @@ async def get_zones_geojson(
     if not zones:
         return GeoJSONFeatureCollection(
             features=[],
+            risk_legend=RISK_LEGEND_DATA,
             links=create_links(
                 request,
                 "/zones/",
@@ -66,7 +68,11 @@ async def get_zones_geojson(
                 risk_category=risk_category,
                 last_updated=zone.last_updated,
             ),
-            links=create_links(request, f"/risk/{zone.geohash}", others=[]),
+            links=create_links(
+                request,
+                f"/risk/{zone.geohash}",
+                others=[{"href": f"/risk/{zone.geohash}/history", "rel": "history"}],
+            ),
         )
         # Fix: the create_links rel=self will be /risk/{geohash}, we want rel=risk-data
         if feature.links:
@@ -81,4 +87,6 @@ async def get_zones_geojson(
         "/zones/",
     )
 
-    return GeoJSONFeatureCollection(features=features, links=collection_links)
+    return GeoJSONFeatureCollection(
+        features=features, risk_legend=RISK_LEGEND_DATA, links=collection_links
+    )

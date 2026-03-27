@@ -5,29 +5,16 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.schemas import FireRiskReadingSchema, GeoJSONFeatureCollection
+from app.schemas import FireRiskReadingSchema
 from app.services.history_service import get_historical_readings
-from app.services.zone_service import get_zones_geojson
 from app.utils.constants import RISK_LEGEND_DATA
 from app.utils.hateoas import create_links
 
-router = APIRouter(prefix="/zones", tags=["Zones"])
-
-
-@router.get("/", response_model=GeoJSONFeatureCollection, response_model_by_alias=True)
-async def get_zones(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> GeoJSONFeatureCollection:
-    """
-    Get all regional monitored zones in GeoJSON format.
-    """
-    # The actual logic is in get_zones_geojson, which now adds the history link
-    return await get_zones_geojson(db, request)
+router = APIRouter(prefix="/history", tags=["History"])
 
 
 @router.get(
-    "/history",
+    "/",
     response_model=List[FireRiskReadingSchema],
     response_model_by_alias=True,
 )
@@ -36,8 +23,8 @@ async def get_zones_history(
     db: AsyncSession = Depends(get_db),
     geohashes: Optional[str] = Query(
         None,
-        description="Comma-separated string of geohashes to filter by. "
-        "If omitted, returns history for all regional zones.",
+        description="Comma-separated string of geohashes to filter by. If omitted, "
+        "returns history for all regional zones.",
     ),
     start_date: Optional[datetime] = Query(
         None, description="Start date for the history (ISO 8601 format)."
@@ -49,7 +36,6 @@ async def get_zones_history(
     """
     Get historical fire risk readings for regional zones
     or a specified list of geohashes.
-    This endpoint is public and returns data only for predefined regional zones.
     """
     geohash_list = geohashes.split(",") if geohashes else None
 
@@ -64,15 +50,11 @@ async def get_zones_history(
     for reading in readings:
         validated = FireRiskReadingSchema.model_validate(reading)
         validated.risk_legend = RISK_LEGEND_DATA
-        # HATEOAS links for individual history items
         validated.links = create_links(
             request,
-            f"/risk/{reading.geohash}",  # Link to the latest risk for this geohash
+            f"/risk/{reading.geohash}",
             others=[
-                {
-                    "href": f"/risk/{reading.geohash}/history",
-                    "rel": "history-single-zone",
-                },  # Link to the protected single zone history
+                {"href": f"/risk/{reading.geohash}/history", "rel": "history"},
             ],
         )
         validated_readings.append(validated)

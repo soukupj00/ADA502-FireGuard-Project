@@ -4,6 +4,7 @@ import pytest
 from conftest import MOCK_GEOHASH
 
 from app.schemas import GeoJSONFeatureCollection, SubscriptionResponse
+from app.utils.constants import RISK_LEGEND_DATA
 
 
 @pytest.mark.asyncio
@@ -92,6 +93,7 @@ async def test_get_my_subscriptions_authorized(
                 ],
             )
         ],
+        risk_legend=RISK_LEGEND_DATA,
         _links=[Link(href="/api/v1/users/me/subscriptions/", rel="self")],
     )
     response = await client.get(
@@ -101,6 +103,7 @@ async def test_get_my_subscriptions_authorized(
     assert response.status_code == 200
     data = response.json()
     assert "FeatureCollection" in data["type"]
+    assert "risk_legend" in data
     assert "@context" in data
     assert data["@context"]["@vocab"] == "https://purl.org/geojson/vocab#"
     assert "_links" in data

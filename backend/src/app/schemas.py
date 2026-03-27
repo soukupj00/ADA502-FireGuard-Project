@@ -78,6 +78,35 @@ class MonitoredZoneSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- New Models for Risk Legend ---
+
+
+class RiskLevel(BaseModel):
+    """Describes a single level of risk."""
+
+    category: str = Field(
+        ..., description="The name of the risk category (e.g., 'Low', 'Moderate')."
+    )
+    score_range: str = Field(
+        ..., description="The score range for this category (e.g., '0-30')."
+    )
+    description: str = Field(
+        ..., description="A brief explanation of what this risk level means."
+    )
+
+
+class RiskLegend(BaseModel):
+    """Provides a key for interpreting risk scores and categories."""
+
+    title: str = "Fire Risk Legend"
+    description: str = (
+        "This legend explains the risk score, which is a "
+        "normalized value from 0-100 derived from the "
+        "Time To Flashover (TTF)."
+    )
+    levels: List[RiskLevel]
+
+
 class FireRiskReadingSchema(BaseModel):
     """Schema for a fire risk reading."""
 
@@ -89,6 +118,9 @@ class FireRiskReadingSchema(BaseModel):
     ttf: float
     prediction_timestamp: datetime
     updated_at: datetime
+    risk_legend: Optional[RiskLegend] = Field(
+        None, description="A key for interpreting the risk scores and categories."
+    )
     context: Dict[str, Any] = Field(
         alias="@context",
         default={
@@ -153,7 +185,7 @@ class UserSubscriptionListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-# GeoJSON Models (with JSON-LD Context)
+# --- GeoJSON Models ---
 
 
 class GeoJSONGeometry(BaseModel):
@@ -184,6 +216,9 @@ class GeoJSONFeature(BaseModel):
 class GeoJSONFeatureCollection(BaseModel):
     type: str = "FeatureCollection"
     features: List[GeoJSONFeature]
+    risk_legend: Optional[RiskLegend] = Field(
+        None, description="A key for interpreting the risk scores and categories."
+    )
     context: Dict[str, Any] = Field(
         alias="@context",
         default={
