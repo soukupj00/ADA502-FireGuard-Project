@@ -19,6 +19,10 @@ RUN npm run build
 
 # STAGE 4: Production (Target this for NREC/Prod)
 FROM nginx:alpine AS production
+
+# Force Alpine to patch the zlib vulnerability Trivy caught
+RUN apk update && apk upgrade --no-cache zlib
+
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy custom Nginx config
