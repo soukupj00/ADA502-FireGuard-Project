@@ -14,6 +14,7 @@ from app.schemas import (
     SubscriptionRequest,
     SubscriptionResponse,
 )
+from app.utils.constants import RISK_LEGEND_DATA
 from app.utils.grid import get_geohash, get_geohash_center
 from app.utils.hateoas import create_links
 from app.utils.redis import redis_client
@@ -127,6 +128,7 @@ async def get_user_subscriptions_logic(
     if not user_geohashes:
         return GeoJSONFeatureCollection(
             features=[],
+            risk_legend=RISK_LEGEND_DATA,
             links=create_links(request, "/users/me/subscriptions/"),
         )
 
@@ -187,7 +189,9 @@ async def get_user_subscriptions_logic(
 
     collection_links = create_links(request, "/users/me/subscriptions/")
 
-    return GeoJSONFeatureCollection(features=features, links=collection_links)
+    return GeoJSONFeatureCollection(
+        features=features, risk_legend=RISK_LEGEND_DATA, links=collection_links
+    )
 
 
 async def unsubscribe_from_location_logic(
