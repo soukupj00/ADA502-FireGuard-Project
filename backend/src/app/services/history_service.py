@@ -36,9 +36,9 @@ async def get_historical_readings(
         )
         regional_geohashes_result = await db.execute(regional_geohashes_query)
         geohashes_to_filter = regional_geohashes_result.scalars().all()
-        stmt = stmt.where(FireRiskReading.geohash.in_(geohashes_to_filter))
+        stmt = stmt.where(FireRiskReading.location_name.in_(geohashes_to_filter))
     else:
-        stmt = stmt.where(FireRiskReading.geohash.in_(geohashes))
+        stmt = stmt.where(FireRiskReading.location_name.in_(geohashes))
 
     # Apply date filtering
     if start_date:
@@ -51,3 +51,17 @@ async def get_historical_readings(
 
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+async def get_historical_readings_by_geohash(
+    db: AsyncSession,
+    geohash: str,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+) -> Sequence[FireRiskReading]:
+    """
+    A convenience wrapper to get historical readings for a single geohash.
+    """
+    return await get_historical_readings(
+        db, geohashes=[geohash], start_date=start_date, end_date=end_date
+    )

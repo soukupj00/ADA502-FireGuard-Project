@@ -7,10 +7,12 @@ from conftest import MOCK_GEOHASH
 @pytest.mark.asyncio
 @patch("app.routers.risk_router.get_latest_risk_reading")
 async def test_get_risk_by_geohash_success(
-    mock_get_risk, client, mock_db_dep, mock_risk_reading
+    mock_get_risk, client, mock_db_dep, mock_risk_reading, mock_auth
 ):
     mock_get_risk.return_value = mock_risk_reading
-    response = await client.get(f"/api/v1/risk/{MOCK_GEOHASH}")
+    response = await client.get(
+        f"/api/v1/risk/{MOCK_GEOHASH}", headers={"Authorization": "Bearer mock-token"}
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["geohash"] == MOCK_GEOHASH
@@ -21,6 +23,7 @@ async def test_get_risk_by_geohash_success(
     assert "self" in rels
     assert "subscribe" in rels
     assert "zones" in rels
+    assert "history" in rels
 
 
 @pytest.mark.asyncio
@@ -34,11 +37,13 @@ async def test_get_risk_by_geohash_not_found(mock_get_risk, client, mock_db_dep)
 @pytest.mark.asyncio
 @patch("app.routers.risk_router.get_latest_risk_by_coords")
 async def test_get_risk_by_coords_success(
-    mock_get_risk, client, mock_db_dep, mock_risk_reading
+    mock_get_risk, client, mock_db_dep, mock_risk_reading, mock_auth
 ):
     mock_get_risk.return_value = mock_risk_reading
     response = await client.get(
-        "/api/v1/risk/coords", params={"latitude": 60.39, "longitude": 5.32}
+        "/api/v1/risk/coords",
+        params={"latitude": 60.39, "longitude": 5.32},
+        headers={"Authorization": "Bearer mock-token"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -49,6 +54,7 @@ async def test_get_risk_by_coords_success(
     assert "self" in rels
     assert "subscribe" in rels
     assert "zones" in rels
+    assert "history" in rels
 
 
 @pytest.mark.asyncio

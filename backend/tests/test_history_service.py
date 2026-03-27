@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,21 @@ from app.services.history_service import get_historical_readings_by_geohash
 def mock_db_session():
     """Provides a mock SQLAlchemy AsyncSession."""
     session = AsyncMock(spec=AsyncSession)
-    session.execute.return_value.scalars.return_value.all.return_value = []
+
+    # We must explicitly define the entire chain of attributes for the test to work.
+    # The return value of session.execute() must have a 'scalars()' method.
+    # The return value of that 'scalars()' method must have an 'all()' method.
+    # Use MagicMock for the chained return values so `.all()` is a normal method
+    mock_scalars = MagicMock()
+    mock_scalars.all.return_value = []
+
+    mock_execute_result = MagicMock()
+    mock_execute_result.scalars.return_value = mock_scalars
+
+    # session.execute is an async call in production; awaiting it should return
+    # our MagicMock execute result (AsyncMock returns its return_value when awaited)
+    session.execute.return_value = mock_execute_result
+
     return session
 
 
@@ -24,9 +38,15 @@ async def test_get_history_no_dates(mock_db_session):
     geohash = "u4pru"
     now = datetime.now(timezone.utc)
     mock_readings = [
-        FireRiskReading(geohash=geohash, prediction_timestamp=now - timedelta(days=1)),
-        FireRiskReading(geohash=geohash, prediction_timestamp=now - timedelta(days=2)),
+        FireRiskReading(
+            location_name=geohash, prediction_timestamp=now - timedelta(days=1)
+        ),
+        FireRiskReading(
+            location_name=geohash, prediction_timestamp=now - timedelta(days=2)
+        ),
     ]
+
+    # Correctly configure the mock to return our readings list
     mock_db_session.execute.return_value.scalars.return_value.all.return_value = (
         mock_readings
     )

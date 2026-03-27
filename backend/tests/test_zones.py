@@ -68,7 +68,7 @@ async def test_get_zones_history_no_params(mock_get_readings, client, mock_db_de
     now = datetime.now(timezone.utc)
     mock_readings = [
         FireRiskReading(
-            geohash=geohash,
+            location_name=geohash,
             prediction_timestamp=now - timedelta(hours=1),
             risk_score=0.5,
             risk_category="Moderate",
@@ -76,7 +76,7 @@ async def test_get_zones_history_no_params(mock_get_readings, client, mock_db_de
             longitude=5.32,
         ),
         FireRiskReading(
-            geohash=geohash,
+            location_name=geohash,
             prediction_timestamp=now - timedelta(hours=2),
             risk_score=0.4,
             risk_category="Low",
@@ -113,7 +113,7 @@ async def test_get_zones_history_with_geohashes(mock_get_readings, client, mock_
     now = datetime.now(timezone.utc)
     mock_readings = [
         FireRiskReading(
-            geohash=geohash1,
+            location_name=geohash1,
             prediction_timestamp=now - timedelta(hours=1),
             risk_score=0.5,
             risk_category="Moderate",
@@ -148,7 +148,7 @@ async def test_get_zones_history_with_dates(mock_get_readings, client, mock_db_d
 
     mock_readings = [
         FireRiskReading(
-            geohash=geohash,
+            location_name=geohash,
             prediction_timestamp=now - timedelta(days=1, hours=1),
             risk_score=0.5,
             risk_category="Moderate",

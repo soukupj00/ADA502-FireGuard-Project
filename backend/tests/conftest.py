@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.auth import get_current_user, get_current_user_ws_or_sse
+from app.auth import (
+    get_current_user,
+    get_current_user_optional,
+    get_current_user_ws_or_sse,
+)
 from app.db.database import get_db
 from app.main import app
 
@@ -36,19 +40,25 @@ def mock_auth():
 
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_current_user_ws_or_sse] = override_get_current_user
+    # Also override the optional auth dependency so endpoints that use it see
+    # the mocked authenticated user during tests.
+    app.dependency_overrides[get_current_user_optional] = override_get_current_user
     yield
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_current_user_ws_or_sse, None)
+    app.dependency_overrides.pop(get_current_user_optional, None)
 
 
 @pytest.fixture
 def mock_db_dep():
+    mock_db = AsyncMock()
+
     async def override_get_db():
-        mock_db = AsyncMock()
         yield mock_db
 
     app.dependency_overrides[get_db] = override_get_db
-    yield
+    # Yield the same mock_db so tests can assert it was passed to service calls
+    yield mock_db
     app.dependency_overrides.pop(get_db, None)
 
 
