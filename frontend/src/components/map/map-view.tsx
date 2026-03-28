@@ -12,6 +12,7 @@ import { useEffect, useMemo } from "react"
 import { MapPatterns } from "./MapPatterns"
 import { getRiskStyle } from "./map-styles"
 import type { MapFeature } from "@/types/map"
+import { MapResizer } from "./map-resizer"
 
 interface MapViewProps {
   center?: LatLngExpression
@@ -92,6 +93,7 @@ export function MapView({
         scrollWheelZoom={true}
         style={{ height: "100%", width: "100%", minHeight: "400px" }}
       >
+        <MapResizer />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

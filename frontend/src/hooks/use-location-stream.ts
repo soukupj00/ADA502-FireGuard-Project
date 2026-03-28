@@ -1,6 +1,6 @@
 import useSWRSubscription from "swr/subscription"
 import keycloak from "@/keycloak"
-import type { FireRiskReading } from "@/lib/types"
+import type { StreamRiskData } from "@/lib/types"
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
 const API_VERSION = "/api/v1"
@@ -17,7 +17,7 @@ export function useLocationStream(geohash: string | null) {
       url: string,
       {
         next,
-      }: { next: (err: Error | null, data?: FireRiskReading | null) => void }
+      }: { next: (err: Error | null, data?: StreamRiskData | null) => void }
     ) => {
       // SSE requires authorization if the endpoint is protected
       // However, Standard EventSource doesn't support custom headers (like Authorization)
@@ -34,7 +34,7 @@ export function useLocationStream(geohash: string | null) {
 
       eventSource.onmessage = (event) => {
         try {
-          const riskData: FireRiskReading = JSON.parse(event.data)
+          const riskData: StreamRiskData = JSON.parse(event.data)
           next(null, riskData)
           eventSource.close()
         } catch (err) {

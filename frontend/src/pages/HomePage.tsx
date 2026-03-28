@@ -13,6 +13,8 @@ import { useZones } from "@/hooks/use-zones"
 import { useMemo } from "react"
 import Geohash from "latlon-geohash"
 import type { MapFeature } from "@/types/map"
+import { HistoryWidget } from "@/components/HistoryWidget"
+import { RiskLegendWidget } from "@/components/RiskLegendWidget"
 
 export default function HomePage({
   isAuthenticated,
@@ -75,34 +77,13 @@ export default function HomePage({
               isError={isError}
             />
           </div>
-          <div className="mt-6 grid grid-cols-2 justify-center gap-4 rounded-lg border bg-muted/20 p-4 text-sm md:grid-cols-4">
-            <div className="flex items-center justify-center gap-2">
-              <div className="h-4 w-4 rounded bg-red-500 shadow-sm ring-1 ring-red-600/20"></div>
-              <span className="font-medium text-red-700 dark:text-red-400">
-                High Risk (&gt; 80%)
-              </span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <div className="h-4 w-4 rounded bg-orange-500 shadow-sm ring-1 ring-orange-600/20"></div>
-              <span className="font-medium text-orange-700 dark:text-orange-400">
-                Medium-High (&gt; 50%)
-              </span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <div className="h-4 w-4 rounded bg-yellow-500 shadow-sm ring-1 ring-yellow-600/20"></div>
-              <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                Medium-Low (&gt; 20%)
-              </span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <div className="h-4 w-4 rounded bg-green-500 shadow-sm ring-1 ring-green-600/20"></div>
-              <span className="font-medium text-green-700 dark:text-green-400">
-                Low Risk (&lt; 20%)
-              </span>
-            </div>
+          <div className="mt-6">
+            <RiskLegendWidget legend={zones?.risk_legend} />
           </div>
         </CardContent>
       </Card>
+
+      <HistoryWidget />
 
       {!isAuthenticated && (
         <Card className="mt-8 border-dashed bg-muted/30">

@@ -7,15 +7,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import RiskAlertsWidget from "@/components/RiskAlertsWidget"
-import { LocationSubscriber } from "@/components/LocationSubscriber"
 import { Button } from "@/components/ui/button"
 import { useState, useMemo } from "react"
-import { MapPin, MousePointerClick } from "lucide-react"
+import {
+  MapPin,
+  MousePointerClick,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react"
 import { useZones } from "@/hooks/use-zones"
 import { useSubscriptions } from "@/hooks/use-subscriptions"
 import Geohash from "latlon-geohash"
 import type { MapFeature } from "@/types/map"
+import { HistoryWidget } from "@/components/HistoryWidget"
+import { RiskLegendWidget } from "@/components/RiskLegendWidget"
+import { SubscriptionPanel } from "@/components/SubscriptionPanel"
 
 export default function DashboardPage() {
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -23,6 +29,9 @@ export default function DashboardPage() {
     lat: number
     lng: number
   } | null>(null)
+
+  // Panel is open by default
+  const [isPanelOpen, setIsPanelOpen] = useState(true)
 
   const handleLocationSelect = (lat: number, lng: number) => {
     setSelectedLocation({ lat, lng })
@@ -100,15 +109,30 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto flex-1 p-4 py-8">
-      <div className="mb-8">
-        <h2 className="mb-2 text-3xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">
-          Manage your monitored zones and analyze specific fire risks.
-        </p>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="mb-2 text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">
+            Manage your monitored zones and analyze specific fire risks.
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          className="shrink-0 gap-2"
+          onClick={() => setIsPanelOpen(!isPanelOpen)}
+        >
+          {isPanelOpen ? (
+            <PanelRightClose className="h-4 w-4" />
+          ) : (
+            <PanelRightOpen className="h-4 w-4" />
+          )}
+          Manage Subscriptions
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="flex flex-col gap-8 lg:col-span-2">
+      <div className="flex flex-col items-start lg:flex-row">
+        <div className="w-full min-w-0 flex-1 transition-all duration-300 ease-in-out">
           <Card className="flex h-full flex-col overflow-hidden border-muted/40 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-4">
               <div>
@@ -126,7 +150,17 @@ export default function DashboardPage() {
               <Button
                 variant={isSelectionMode ? "default" : "outline"}
                 size="sm"
-                onClick={() => setIsSelectionMode(!isSelectionMode)}
+                onClick={() => {
+                  setIsSelectionMode(!isSelectionMode)
+                  // If we are cancelling selection mode, clear the selected location
+                  if (isSelectionMode) {
+                    setSelectedLocation(null)
+                  }
+                  // If opening selection mode and panel is closed, open it so user sees the form
+                  if (!isSelectionMode && !isPanelOpen) {
+                    setIsPanelOpen(true)
+                  }
+                }}
                 className="gap-2"
               >
                 {isSelectionMode ? (
@@ -137,57 +171,53 @@ export default function DashboardPage() {
                 {isSelectionMode ? "Cancel Selection" : "Select Area"}
               </Button>
             </CardHeader>
-            <CardContent className="relative min-h-125 flex-1 p-0">
+            <CardContent className="relative flex min-h-[400px] flex-1 flex-col p-0">
               {isSelectionMode ? (
-                <SelectionMap
-                  selectedLocation={selectedLocation}
-                  onLocationSelect={handleLocationSelect}
-                />
+                <div className="min-h-[400px] flex-1">
+                  <SelectionMap
+                    selectedLocation={selectedLocation}
+                    onLocationSelect={handleLocationSelect}
+                  />
+                </div>
               ) : (
-                <MapView
-                  features={mapFeatures}
-                  isLoading={isRegionalLoading || isSubsLoading}
-                  isError={isRegionalError || isSubsError}
-                  autoZoomToBounds={true}
-                />
+                <div className="min-h-[400px] flex-1">
+                  <MapView
+                    features={mapFeatures}
+                    isLoading={isRegionalLoading || isSubsLoading}
+                    isError={isRegionalError || isSubsError}
+                    autoZoomToBounds={true}
+                  />
+                </div>
               )}
+              <div className="border-t bg-muted/10 p-4">
+                <RiskLegendWidget legend={regionalZones?.risk_legend} />
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="flex flex-col gap-8">
-          <Card
-            className={`shadow-sm transition-all duration-300 ${selectedLocation ? "border-primary ring-1 ring-primary" : ""}`}
-          >
-            <CardHeader className="pb-4">
-              <CardTitle>Subscribe to Area</CardTitle>
-              <CardDescription>
-                {isSelectionMode
-                  ? "Click the map to select coordinates"
-                  : "Click 'Select Area' on the map to pick a new location"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LocationSubscriber
-                selectedLat={selectedLocation?.lat ?? null}
-                selectedLon={selectedLocation?.lng ?? null}
-                onSuccess={() => setIsSelectionMode(false)}
-              />
-            </CardContent>
-          </Card>
-
-          <Card className="flex-1 shadow-sm">
-            <CardHeader className="pb-4">
-              <CardTitle>My Subscriptions</CardTitle>
-              <CardDescription>
-                Manage your personalized risk alerts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RiskAlertsWidget />
-            </CardContent>
-          </Card>
+        <div
+          className={`shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${
+            isPanelOpen
+              ? "mt-8 w-full opacity-100 lg:mt-0 lg:ml-8 lg:w-[400px]"
+              : "m-0 h-0 w-0 opacity-0 lg:h-auto"
+          }`}
+        >
+          <div className="w-full lg:w-[400px]">
+            <SubscriptionPanel
+              isSelectionMode={isSelectionMode}
+              selectedLocation={selectedLocation}
+              onSubscriptionSuccess={() => {
+                setIsSelectionMode(false)
+                setSelectedLocation(null)
+              }}
+            />
+          </div>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <HistoryWidget />
       </div>
     </div>
   )
