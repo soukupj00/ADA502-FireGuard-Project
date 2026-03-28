@@ -17,6 +17,7 @@ import type { MapFeature } from "@/types/map"
 import { useZones } from "@/hooks/use-zones"
 import Geohash from "latlon-geohash"
 import { getRiskStyle } from "./map-styles"
+import { MapResizer } from "./map-resizer"
 
 // Fix for the default marker icon in react-leaflet
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl: unknown })
@@ -153,6 +154,7 @@ export function SelectionMap({
           cursor: "crosshair",
         }}
       >
+        <MapResizer />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

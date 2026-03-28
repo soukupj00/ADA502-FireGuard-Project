@@ -16,9 +16,22 @@ export interface GeoJSONFeature {
   properties: GeoJSONProperties
 }
 
+export interface RiskLevel {
+  category: string
+  score_range: string
+  description: string
+}
+
+export interface RiskLegend {
+  title: string
+  description: string
+  levels: RiskLevel[]
+}
+
 export interface GeoJSONResponse {
   type: "FeatureCollection"
   features: GeoJSONFeature[]
+  risk_legend?: RiskLegend
 }
 
 export interface FireRiskReading {
@@ -27,9 +40,18 @@ export interface FireRiskReading {
   longitude: number
   risk_score: number | null
   risk_category: string | null
-  ttf: number
+  ttf: number | null
   prediction_timestamp: string
-  updated_at: string
+  updated_at: string | null
+  risk_legend?: RiskLegend
+}
+
+export interface StreamRiskData {
+  location_id: string
+  risk_level: string
+  risk_score: number
+  ttf: number
+  timestamp: string
 }
 
 export interface SubscriptionRequest {

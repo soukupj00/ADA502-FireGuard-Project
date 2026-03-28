@@ -4,6 +4,7 @@ import type {
   GeoJSONResponse,
   SubscriptionRequest,
   SubscriptionResponse,
+  FireRiskReading,
 } from "./types"
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
@@ -41,6 +42,25 @@ export async function fetchZones(
   )
   if (!response.ok) {
     throw new Error("Failed to fetch zones")
+  }
+  return response.json()
+}
+
+export const fetchHistory = async (
+  startDate?: string,
+  endDate?: string,
+  geohashes?: string
+): Promise<FireRiskReading[]> => {
+  const params = new URLSearchParams()
+  if (startDate) params.append("start_date", startDate)
+  if (endDate) params.append("end_date", endDate)
+  if (geohashes) params.append("geohashes", geohashes)
+
+  const response = await fetch(
+    `${API_BASE_URL}${API_VERSION}/history/?${params.toString()}`
+  )
+  if (!response.ok) {
+    throw new Error("Failed to fetch history")
   }
   return response.json()
 }

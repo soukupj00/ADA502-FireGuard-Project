@@ -27,7 +27,7 @@ export function LocationSubscriber({
   useEffect(() => {
     if (riskData) {
       toast.info("Real-time risk data received!", {
-        description: `Risk Level: ${riskData.risk_category} (Score: ${riskData.risk_score?.toFixed(2)})`,
+        description: `Risk Level: ${riskData.risk_level} (Score: ${riskData.risk_score?.toFixed(2)})`,
       })
       // Clear pending geohash once data is received
       setPendingGeohash(null)
@@ -54,7 +54,7 @@ export function LocationSubscriber({
       toast.error("Authentication Required", {
         description: "Please log in to subscribe to alerts.",
       })
-      keycloak.login()
+      await keycloak.login()
       return
     }
 
@@ -77,8 +77,8 @@ export function LocationSubscriber({
         setPendingGeohash(response.geohash)
       } else {
         // If it was already active, we just refresh everything
-        mutate(["/zones", false])
-        mutate("/users/me/subscriptions/")
+        await mutate(["/zones", false])
+        await mutate("/users/me/subscriptions/")
         if (onSuccess) onSuccess()
       }
     } catch (error: unknown) {
