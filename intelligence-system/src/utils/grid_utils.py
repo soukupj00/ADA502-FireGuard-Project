@@ -77,6 +77,7 @@ def generate_initial_zones() -> List[dict]:
                         "center_lon": lon,
                         "is_regional": True,
                         "name": f"Regional Zone {gh}",
+                        "is_analytics_target": False,
                     }
                 )
                 seen_hashes.add(gh)

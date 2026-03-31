@@ -1,22 +1,43 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.background import redis_listener_task
 from app.db.database import create_db_and_tables
 from app.routers import history_router, risk_router, subscription, zones
+from app.services.mqtt_service import mqtt_client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize resources (e.g., ML models, DB connections)
+    # Startup: Initialize resources
     print("FireGuard API starting up...")
     # Ensure all tables (like user_subscriptions) exist
     await create_db_and_tables()
+
+    # Connect to MQTT broker
+    await mqtt_client.connect_async()
+
+    # Start the Redis listener as a background task
+    redis_task = asyncio.create_task(redis_listener_task())
+
     yield
+
     # Shutdown: Clean up resources
     print("FireGuard API shutting down...")
+
+    # Stop the Redis listener task
+    redis_task.cancel()
+    try:
+        await redis_task
+    except asyncio.CancelledError:
+        print("Redis listener task successfully cancelled.")
+
+    # Disconnect from MQTT
+    mqtt_client.stop()
 
 
 def create_app() -> FastAPI:
@@ -31,7 +52,6 @@ def create_app() -> FastAPI:
     )
 
     # Get allowed origins from env, defaulting to development settings
-    # In docker-compose, we can pass "http://<YOUR_IP>" or "*"
     origins_str = os.getenv(
         "BACKEND_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
     )

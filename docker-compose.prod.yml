@@ -55,6 +55,8 @@ services:
       - keycloak
       - redis
       - hivemq # Backend needs MQTT to publish alerts
+    env_file:
+      - ./.env
     environment:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
       REDIS_URL: redis://redis:6379/0

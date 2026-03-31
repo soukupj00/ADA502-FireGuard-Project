@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from config import settings
 from utils.fire_risk_service import calculate_risk_score
@@ -40,14 +40,19 @@ class MonitoredZone(Base):
 
     __tablename__ = "monitored_zones"
 
-    geohash = Column(String, primary_key=True, index=True)
-    center_lat = Column(Float, nullable=False)
-    center_lon = Column(Float, nullable=False)
-    is_regional = Column(
+    geohash: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    center_lat: Mapped[float] = mapped_column(Float, nullable=False)
+    center_lon: Mapped[float] = mapped_column(Float, nullable=False)
+    is_regional: Mapped[bool] = mapped_column(
         Boolean, default=True
     )  # True = Tier 1 (Map), False = Tier 2 (User)
-    name = Column(String, nullable=True)  # Optional descriptive name
-    last_updated = Column(DateTime(timezone=True), server_default=func.now())
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_analytics_target: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # True if this zone's data should be pushed to ThingSpeak
+    last_updated: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class WeatherDataReading(Base):
@@ -73,6 +78,7 @@ class FireRiskReading(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     ttf = Column(Float)
+    rh_in = Column(Float, nullable=True)
     risk_score = Column(Float, nullable=True)
     risk_category = Column(String, nullable=True)
     prediction_timestamp = Column(DateTime(timezone=True))
@@ -91,6 +97,7 @@ class CurrentFireRisk(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     ttf = Column(Float)
+    rh_in = Column(Float, nullable=True)
     risk_score = Column(Float, nullable=True)
     risk_category = Column(String, nullable=True)
     prediction_timestamp = Column(DateTime(timezone=True))
@@ -164,6 +171,7 @@ async def save_risk_data(
     """
     # Calculate risk score and category
     ttf = risk_result["ttf"]
+    rh_in = risk_result.get("rh_in")
     risk_score, risk_category = calculate_risk_score(ttf)
 
     async with AsyncSessionLocal() as db:
@@ -173,6 +181,7 @@ async def save_risk_data(
             latitude=lat,
             longitude=lon,
             ttf=ttf,
+            rh_in=rh_in,
             risk_score=risk_score,
             risk_category=risk_category,
             prediction_timestamp=risk_result["timestamp"],
@@ -185,6 +194,7 @@ async def save_risk_data(
             latitude=lat,
             longitude=lon,
             ttf=ttf,
+            rh_in=rh_in,
             risk_score=risk_score,
             risk_category=risk_category,
             prediction_timestamp=risk_result["timestamp"],
@@ -195,6 +205,7 @@ async def save_risk_data(
             index_elements=["geohash"],
             set_={
                 "ttf": stmt.excluded.ttf,
+                "rh_in": stmt.excluded.rh_in,
                 "risk_score": stmt.excluded.risk_score,
                 "risk_category": stmt.excluded.risk_category,
                 "prediction_timestamp": stmt.excluded.prediction_timestamp,

@@ -35,6 +35,9 @@ class MonitoredZone(Base):
         Boolean, default=True
     )  # True = Tier 1 (Map), False = Tier 2 (User)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_analytics_target: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # True if this zone's data should be pushed to ThingSpeak
     last_updated: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
