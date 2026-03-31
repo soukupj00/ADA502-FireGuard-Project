@@ -42,7 +42,17 @@ services:
     ports:
       - "6379:6379" # Expose in dev so you can inspect it with RedisInsight/CLI
 
-  # 4. FastAPI Backend
+  # 4. HiveMQ MQTT Broker (NEW)
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    restart: always
+    ports:
+      - "1883:1883" # Expose MQTT for dev scripts
+      - "8000:8000" # Expose WebSockets for local browser testing
+    volumes:
+      - hivemq_data_dev:/opt/hivemq/data
+
+  # 5. FastAPI Backend
   backend:
     build:
       context: ./backend
@@ -53,6 +63,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_started
+      hivemq:
         condition: service_started
     environment:
       DATABASE_URL: postgresql+asyncpg://user:password@db:5432/fireguard_db
@@ -65,7 +77,7 @@ services:
         - action: rebuild
           path: ./backend/pyproject.toml
 
-  # 5. Intelligence System (The Worker)
+  # 6. Intelligence System (The Worker)
   intelligence:
     build:
       context: ./intelligence-system
@@ -86,7 +98,7 @@ services:
         - action: rebuild
           path: ./intelligence-system/pyproject.toml
 
-  # 6. React Frontend
+  # 7. React Frontend
   frontend:
     build:
       context: ./frontend
@@ -99,7 +111,6 @@ services:
       - VITE_KEYCLOAK_URL=http://localhost:8080/auth
     depends_on:
       - backend
-    # ADD THIS SECTION BELOW:
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
@@ -108,7 +119,7 @@ services:
       # Prevent node_modules from being overwritten by the host
       - /app/node_modules
 
-  # 7. Keycloak
+  # 8. Keycloak
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     command: start-dev
@@ -137,3 +148,4 @@ services:
 volumes:
   postgres_data_dev:
   keycloak_data_dev:
+  hivemq_data_dev:

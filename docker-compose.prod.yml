@@ -31,12 +31,22 @@ services:
       timeout: 5s
       retries: 5
 
-  # 3. Redis (For SSE and Caching)
+  # 3. Redis (For Event Triggering and Caching)
   redis:
     image: redis:7-alpine
     restart: always
 
-  # 4. FastAPI Backend
+  # 4. HiveMQ MQTT Broker (NEW)
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    restart: always
+    ports:
+      - "1883:1883"   # Standard MQTT Port for the Backend to publish
+      # Port 8000 is internal for WebSockets, shielded by Nginx
+    volumes:
+      - hivemq_data:/opt/hivemq/data
+
+  # 5. FastAPI Backend
   backend:
     build: ./backend
     restart: always
@@ -44,11 +54,12 @@ services:
       - db
       - keycloak
       - redis
+      - hivemq # Backend needs MQTT to publish alerts
     environment:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
       REDIS_URL: redis://redis:6379/0
 
-  # 5. Intelligence System
+  # 6. Intelligence System
   intelligence:
     build: ./intelligence-system
     restart: always
@@ -59,7 +70,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db
       REDIS_URL: redis://redis:6379/0
 
-  # 6. Frontend + Nginx Proxy (The ONLY public entry point)
+  # 7. Frontend + Nginx Proxy
   frontend:
     build:
       context: ./frontend
@@ -72,11 +83,12 @@ services:
     depends_on:
       - backend
       - keycloak
-    volumes: # Mount the certificates into Nginx
+      - hivemq # Nginx needs HiveMQ running to proxy WebSockets
+    volumes:
       - ./nginx-selfsigned.crt:/etc/nginx/ssl/cert.crt:ro
       - ./nginx-selfsigned.key:/etc/nginx/ssl/cert.key:ro
 
-  # 7. Keycloak Auth Server
+  # 8. Keycloak Auth Server
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     command: start-dev
@@ -94,8 +106,8 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    # NO ports section here. It is fully shielded by Nginx.
 
 volumes:
   postgres_data:
   keycloak_data:
+  hivemq_data:
