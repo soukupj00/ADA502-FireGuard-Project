@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     HIVEMQ_PORT: int = 1883  # Standard MQTT port
 
     # ThingSpeak API Settings
-    THINGSPEAK_API_KEY: str = ""  # ThingSpeak Write API Key
+    THINGSPEAK_WRITE_API_KEY: str = ""  # ThingSpeak Write API Key
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

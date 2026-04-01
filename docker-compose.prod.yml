@@ -61,6 +61,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://fireuser:firepassword@db:5432/fireguard_db}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       MQTT_BROKER_URL: ${MQTT_BROKER_URL:-mqtt://hivemq:1883}
+      THINGSPEAK_WRITE_API_KEY: ${THINGSPEAK_WRITE_API_KEY}
 
   # 6. Intelligence System
   intelligence:

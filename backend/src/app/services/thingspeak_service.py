@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class ThingSpeakService:
     def __init__(self):
-        self.api_key = settings.THINGSPEAK_API_KEY
+        self.api_key = settings.THINGSPEAK_WRITE_API_KEY
         self.base_url = "https://api.thingspeak.com/update"
 
     async def push_data(self, data_points: Dict[str, Any]) -> bool:
